@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BST Visualizer | Counters</title>
+    <title>Tree Visualizer | Final UI</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,9 +11,8 @@
 
     <style>
         :root {
-            /* Light Theme Variables */
             --bg-color: #f8fafc;
-            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-bg: rgba(255, 255, 255, 0.95);
             --glass-border: rgba(0, 0, 0, 0.1);
             --text-main: #334155;
             --accent: #6366f1;
@@ -21,19 +20,17 @@
             --node-bg: #ffffff;
             --node-border: #6366f1;
             --node-text: #334155;
-            --line-color: #94a3b8;
+            --line-color: #94a3b8; 
             --grid-color: rgba(0, 0, 0, 0.05);
             --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            
-            /* Search Colors */
-            --visited-color: #f59e0b; /* Orange */
-            --found-color: #22c55e;   /* Green */
+            --anim-left: #f97316;
+            --anim-right: #3b82f6;
+            --found-color: #22c55e;
         }
 
         [data-theme="dark"] {
-            /* Dark Theme */
             --bg-color: #020617; 
-            --glass-bg: rgba(15, 23, 42, 0.75);
+            --glass-bg: rgba(15, 23, 42, 0.9);
             --glass-border: rgba(255, 255, 255, 0.1);
             --text-main: #f8fafc;
             --accent: #818cf8; 
@@ -44,6 +41,8 @@
             --line-color: #475569;
             --grid-color: rgba(255, 255, 255, 0.03);
             --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            --anim-left: #fb923c;
+            --anim-right: #60a5fa;
         }
 
         * { box-sizing: border-box; }
@@ -52,19 +51,13 @@
             font-family: 'Roboto', sans-serif;
             background-color: var(--bg-color);
             color: var(--text-main);
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
+            margin: 0; padding: 0;
+            height: 100vh; overflow: hidden;
+            display: flex; flex-direction: column; /* Stack UI on top of Canvas */
         }
 
-        /* Animated Background Grid */
         body::before {
-            content: "";
-            position: absolute;
-            inset: 0;
+            content: ""; position: absolute; inset: 0;
             background-image: 
                 linear-gradient(var(--grid-color) 1px, transparent 1px),
                 linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
@@ -73,242 +66,180 @@
             mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
         }
 
-        /* --- Floating UI Header --- */
+        /* --- UI PANEL --- */
         .ui-layer {
-            position: absolute;
-            top: 20px; 
-            width: 90%;
-            max-width: 500px;
-            z-index: 100;
-            display: flex;
-            flex-direction: column;
-            pointer-events: none; 
+            position: relative; width: 100%;
+            display: flex; justify-content: center;
+            padding: 15px 15px 0 15px;
+            z-index: 10;
         }
 
         .glass-panel {
-            pointer-events: auto;
             background: var(--glass-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 20px;
+            border-radius: 16px; padding: 12px 15px;
             box-shadow: var(--shadow);
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
+            width: 100%; max-width: 1000px;
+            
+            /* Horizontal Layout */
+            display: flex; 
+            flex-wrap: wrap; 
+            align-items: center; 
+            gap: 12px;
         }
 
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 5px;
-        }
+        .header-section { display: flex; align-items: center; gap: 10px; margin-right: 10px; }
 
         h1 {
-            margin: 0;
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 800;
-            font-size: 1.4rem;
+            margin: 0; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 1.2rem;
             background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            white-space: nowrap;
         }
 
-        .controls-group {
-            display: flex;
-            gap: 10px;
-            width: 100%;
+        /* Container for Inputs */
+        .controls-row {
+            display: flex; flex: 1; gap: 10px; align-items: center;
+            min-width: 300px;
         }
+
+        /* VISUALIZE GROUP (Expands) */
+        .input-group-main {
+            display: flex; gap: 6px; 
+            flex-grow: 1; /* This makes the input box expand to fill space */
+        }
+        
+        /* SEARCH GROUP (Fixed) */
+        .input-group-search {
+            display: flex; gap: 6px;
+            flex-shrink: 0; /* Keeps it next to the main group */
+        }
+
+        /* Mode Switch */
+        .mode-switch {
+            display: flex; background: var(--input-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px; overflow: hidden;
+            cursor: pointer; height: 36px; min-width: 130px;
+        }
+        .mode-option {
+            flex: 1; padding: 0 5px; text-align: center;
+            font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 0.8rem;
+            transition: all 0.2s; color: var(--text-main);
+            background: transparent; border: none; opacity: 0.5; white-space: nowrap;
+        }
+        .mode-option:hover { background: rgba(0,0,0,0.05); opacity: 1; }
+        .mode-option.active { background: var(--accent); color: white; opacity: 1; }
 
         input {
-            flex: 1;
-            padding: 12px 15px;
-            border-radius: 10px;
+            padding: 0 12px; border-radius: 8px;
             border: 1px solid var(--glass-border);
-            background: var(--input-bg);
-            color: var(--text-main);
-            outline: none;
-            font-family: 'Roboto', sans-serif;
-            font-size: 0.95rem;
-            transition: all 0.2s;
-            text-transform: uppercase; /* VISUAL UPPERCASE */
+            background: var(--input-bg); color: var(--text-main);
+            outline: none; font-family: 'Roboto', sans-serif; font-size: 0.9rem;
+            transition: all 0.2s; text-transform: uppercase; height: 36px;
         }
-        input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.2);
-        }
+        input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.2); }
+
+        /* The Main Input expands */
+        #node-input { width: 100%; } 
+        
+        /* The Search Input stays small */
+        #search-input { width: 70px; text-align: center; padding: 0 5px; }
 
         .btn-action {
-            padding: 0 20px;
-            background: var(--accent);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-weight: 600;
-            font-family: 'Montserrat', sans-serif;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
+            padding: 0 15px; background: var(--accent); color: white;
+            border: none; border-radius: 8px; font-weight: 700;
+            font-family: 'Montserrat', sans-serif; cursor: pointer;
+            transition: all 0.2s; white-space: nowrap; font-size: 0.85rem; height: 36px;
         }
         .btn-action:hover { filter: brightness(1.1); transform: translateY(-1px); }
         .btn-action:active { transform: translateY(0); }
-        
-        .btn-search { background-color: #10b981; } /* Greenish */
-        
-        .btn-action:disabled {
-            background-color: var(--line-color);
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
+        .btn-search { background-color: #10b981; }
+        .btn-action:disabled { background-color: var(--line-color); opacity: 0.5; cursor: not-allowed; transform: none; }
 
         .theme-toggle {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--glass-border);
-            color: var(--text-main);
-            padding: 6px 12px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            font-weight: 500;
+            background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+            color: var(--text-main); padding: 5px 10px; border-radius: 8px;
+            cursor: pointer; font-size: 0.75rem; font-weight: 600;
         }
-        .theme-toggle:hover { background: rgba(255,255,255,0.1); }
 
-        /* Path Status Result */
         .path-status {
-            font-family: 'monospace';
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: var(--text-main);
-            text-align: center;
-            min-height: 1.2em;
-            padding-top: 5px;
-            border-top: 1px dashed var(--glass-border);
+            width: 100%; font-family: 'monospace'; font-size: 0.9rem; font-weight: 600;
+            color: var(--text-main); text-align: center;
+            padding-top: 8px; margin-top: 5px; border-top: 1px dashed var(--glass-border);
         }
-        .count-left { color: #f59e0b; }
-        .count-right { color: #3b82f6; }
+        .count-left { color: var(--anim-left); }
+        .count-right { color: var(--anim-right); }
 
-        /* --- Canvas --- */
+        /* --- CANVAS --- */
         #canvas-container {
-            width: 100vw;
-            height: 100vh;
-            cursor: grab;
-            touch-action: none;
+            flex: 1; /* Fills remaining height */
+            width: 100%; position: relative; overflow: hidden;
+            cursor: grab; touch-action: none;
         }
         #canvas-container:active { cursor: grabbing; }
 
         .hint-overlay {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 0.8rem;
-            color: var(--text-main);
-            opacity: 0.5;
-            pointer-events: none;
-            user-select: none;
-            background: var(--glass-bg);
-            padding: 6px 12px;
-            border-radius: 20px;
-            border: 1px solid var(--glass-border);
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            font-size: 0.85rem; color: var(--text-main); opacity: 0.6;
+            pointer-events: none; user-select: none;
+            background: var(--glass-bg); padding: 8px 16px;
+            border-radius: 20px; border: 1px solid var(--glass-border);
+            font-weight: 500;
         }
 
-        /* SVG Styles */
         .node-group { cursor: pointer; }
+        .node-circle { fill: var(--node-bg); stroke: var(--node-border); stroke-width: 2.5px; transition: all 0.4s ease; }
+        .node-text { fill: var(--node-text); font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 13px; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
         
-        .node-circle {
-            fill: var(--node-bg);
-            stroke: var(--node-border);
-            stroke-width: 2.5px;
-            transition: all 0.4s ease;
-        }
+        .link { fill: none; stroke: var(--line-color); stroke-width: 2px; stroke-linecap: round; transition: stroke 0.4s ease, stroke-width 0.4s ease; }
+        .edge-label-bg { fill: var(--bg-color); stroke: var(--line-color); stroke-width: 1px; }
+        .edge-label-text { font-size: 9px; fill: var(--text-main); font-family: 'Roboto Mono', monospace; text-anchor: middle; dominant-baseline: middle; font-weight: bold; }
+
+        .node-circle.visited { stroke: var(--accent); fill: #eef2ff; }
+        .node-circle.found { stroke: var(--found-color) !important; fill: #f0fdf4 !important; transform-box: fill-box; transform-origin: center; transform: scale(1.3); }
+        [data-theme="dark"] .node-circle.visited { fill: #1e1b4b; }
+        [data-theme="dark"] .node-circle.found { fill: #052e16 !important; }
+
+        .link.anim-left { stroke: var(--anim-left) !important; stroke-width: 4px; filter: drop-shadow(0 0 3px var(--anim-left)); }
+        .link.anim-right { stroke: var(--anim-right) !important; stroke-width: 4px; filter: drop-shadow(0 0 3px var(--anim-right)); }
+
+        .animate-pop { transform-box: fill-box; transform-origin: center; animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; opacity: 0; }
+        @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         
-        .node-text {
-            fill: var(--node-text);
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 700;
-            font-size: 13px;
-            text-anchor: middle;
-            dominant-baseline: central;
-            pointer-events: none;
-            user-select: none;
+        @media (max-width: 800px) {
+            .glass-panel { justify-content: center; }
+            .header-section { width: 100%; justify-content: space-between; }
+            .controls-row { flex-direction: column; width: 100%; align-items: stretch; }
+            .input-group-search { justify-content: center; margin-top: 5px; }
         }
-
-        .link {
-            fill: none;
-            stroke: var(--line-color);
-            stroke-width: 2px;
-            stroke-linecap: round;
-            transition: all 0.4s ease;
-        }
-
-        /* Edge Labels (L and R) */
-        .edge-label-bg {
-            fill: var(--bg-color); 
-            stroke: var(--line-color);
-            stroke-width: 1px;
-            transition: fill 0.4s ease;
-        }
-        .edge-label-text {
-            font-size: 9px;
-            fill: var(--text-main);
-            font-family: 'Roboto Mono', monospace;
-            text-anchor: middle;
-            dominant-baseline: middle;
-            pointer-events: none;
-            font-weight: bold;
-        }
-
-        /* Highlight Classes */
-        .node-circle.visited {
-            stroke: var(--visited-color);
-            fill: #fff7ed; 
-        }
-        .node-circle.found {
-            stroke: var(--found-color);
-            fill: #f0fdf4;
-            transform-box: fill-box;
-            transform-origin: center;
-            transform: scale(1.2);
-        }
-        .link.visited { stroke: var(--visited-color); stroke-width: 3px; }
-        
-        /* Dark mode specific tints */
-        [data-theme="dark"] .node-circle.visited { fill: #451a03; }
-        [data-theme="dark"] .node-circle.found { fill: #052e16; }
-
-        .animate-pop {
-            transform-box: fill-box;
-            transform-origin: center;
-            animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-            opacity: 0;
-        }
-        @keyframes popIn {
-            0% { transform: scale(0); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
     </style>
 </head>
 <body>
 
     <div class="ui-layer">
         <div class="glass-panel">
-            <header>
-                <h1>BST Visualizer</h1>
-                <button class="theme-toggle" onclick="toggleTheme()">🌗 Theme</button>
-            </header>
-            
-            <div class="controls-group">
-                <input type="text" id="node-input" placeholder="e.g. A, B, C or 10, 5, 15" value="M, G, P, B, H, N, S">
-                <button class="btn-action" onclick="initTree()">Visualize</button>
+            <div class="header-section">
+                <h1>Tree Visualizer</h1>
+                <button class="theme-toggle" onclick="toggleTheme()">🌗</button>
             </div>
 
-            <div class="controls-group">
-                <input type="text" id="search-input" placeholder="Search Value..." oninput="handleSearchInput()">
-                <button id="btn-search" class="btn-action btn-search" onclick="searchTree()" disabled>Search</button>
+            <div class="controls-row">
+                <div class="mode-switch">
+                    <button id="mode-bst" class="mode-option active" onclick="setMode('BST')">BST</button>
+                    <button id="mode-avl" class="mode-option" onclick="setMode('AVL')">AVL</button>
+                </div>
+
+                <div class="input-group-main">
+                    <input type="text" id="node-input" placeholder="e.g. 10, 20, 30" value="10, 20, 30, 40, 50, 25">
+                    <button class="btn-action" onclick="initTree()">Go</button>
+                </div>
+
+                <div class="input-group-search">
+                    <input type="text" id="search-input" placeholder="#" oninput="handleSearchInput()">
+                    <button id="btn-search" class="btn-action btn-search" onclick="searchTree()" disabled>Find</button>
+                </div>
             </div>
 
             <div id="path-display" class="path-status">
@@ -325,135 +256,117 @@
     </div>
 
     <script>
-        // --- Theme Logic ---
         function toggleTheme() {
             const html = document.documentElement;
-            const current = html.getAttribute('data-theme');
-            html.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+            html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
         }
 
-        // --- BST Data Structures ---
         let nodeIdCounter = 0; 
+        let isAVLMode = false;
+
+        function setMode(mode) {
+            isAVLMode = (mode === 'AVL');
+            document.getElementById('mode-bst').classList.toggle('active', !isAVLMode);
+            document.getElementById('mode-avl').classList.toggle('active', isAVLMode);
+            initTree();
+        }
 
         class Node {
             constructor(val) {
                 this.id = nodeIdCounter++; 
                 this.value = val;
-                this.left = null; 
-                this.right = null;
-                this.x = 0; 
-                this.y = 0;
+                this.left = null; this.right = null;
+                this.height = 1; this.x = 0; this.y = 0;
             }
         }
 
-        class BST {
-            constructor() { this.root = null; }
-            
+        class Tree {
+            constructor(isAVL) { this.root = null; this.isAVL = isAVL; }
             compare(a, b) {
-                // Try comparing as numbers first
-                const numA = parseFloat(a);
-                const numB = parseFloat(b);
+                const numA = parseFloat(a), numB = parseFloat(b);
                 if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-                // Otherwise string comparison
                 return String(a).localeCompare(String(b));
             }
-
-            insert(val) {
-                const n = new Node(val);
-                if (!this.root) this.root = n;
-                else this.insertNode(this.root, n);
+            getHeight(N) { return N ? N.height : 0; }
+            getBalance(N) { return N ? this.getHeight(N.left) - this.getHeight(N.right) : 0; }
+            rightRotate(y) {
+                let x = y.left; let T2 = x.right;
+                x.right = y; y.left = T2;
+                y.height = Math.max(this.getHeight(y.left), this.getHeight(y.right)) + 1;
+                x.height = Math.max(this.getHeight(x.left), this.getHeight(x.right)) + 1;
+                return x;
             }
-
-            insertNode(node, newNode) {
-                if (this.compare(newNode.value, node.value) < 0) {
-                    if (!node.left) node.left = newNode;
-                    else this.insertNode(node.left, newNode);
-                } else {
-                    if (!node.right) node.right = newNode;
-                    else this.insertNode(node.right, newNode);
-                }
+            leftRotate(x) {
+                let y = x.right; let T2 = y.left;
+                y.left = x; x.right = T2;
+                x.height = Math.max(this.getHeight(x.left), this.getHeight(x.right)) + 1;
+                y.height = Math.max(this.getHeight(y.left), this.getHeight(y.right)) + 1;
+                return y;
             }
+            insert(val) { this.root = this.insertNode(this.root, val); }
+            insertNode(node, val) {
+                if (!node) return new Node(val);
+                if (this.compare(val, node.value) < 0) node.left = this.insertNode(node.left, val);
+                else node.right = this.insertNode(node.right, val);
 
-            // MODIFIED: Returns Counters instead of string
+                if (!this.isAVL) return node;
+                node.height = 1 + Math.max(this.getHeight(node.left), this.getHeight(node.right));
+                let balance = this.getBalance(node);
+                if (balance > 1 && this.compare(val, node.left.value) < 0) return this.rightRotate(node);
+                if (balance < -1 && this.compare(val, node.right.value) >= 0) return this.leftRotate(node);
+                if (balance > 1 && this.compare(val, node.left.value) > 0) { node.left = this.leftRotate(node.left); return this.rightRotate(node); }
+                if (balance < -1 && this.compare(val, node.right.value) < 0) { node.right = this.rightRotate(node.right); return this.leftRotate(node); }
+                return node;
+            }
             getSearchData(val) {
                 const pathNodes = [];
-                let leftCount = 0;
-                let rightCount = 0;
+                let leftCount = 0, rightCount = 0;
                 let current = this.root;
-                
                 while(current) {
                     pathNodes.push(current);
                     const diff = this.compare(val, current.value);
-                    
-                    if (diff === 0) return { pathNodes, leftCount, rightCount, found: true }; // Found
-                    
-                    if (diff < 0) {
-                        current = current.left;
-                        leftCount++;
-                    } else {
-                        current = current.right;
-                        rightCount++;
-                    }
+                    if (diff === 0) return { pathNodes, leftCount, rightCount, found: true }; 
+                    if (diff < 0) { current = current.left; leftCount++; } 
+                    else { current = current.right; rightCount++; }
                 }
-                // Not found, but still return path taken so far
                 return { pathNodes, leftCount, rightCount, found: false };
             }
         }
 
-        // --- Config ---
-        const NODE_R = 18;  
-        const X_GAP = 30;   
-        const Y_GAP = 70;   
-        
-        let bstInstance = null;
+        const NODE_R = 18, X_GAP = 30, Y_GAP = 70;   
+        let treeInstance = null;
         let viewState = { scale: 1, pX: 0, pY: 0, isDragging: false, startX: 0, startY: 0 };
         const container = document.getElementById('canvas-container');
         const viewport = document.getElementById('viewport');
         const searchBtn = document.getElementById('btn-search');
         const pathDisplay = document.getElementById('path-val');
 
-        // --- Core Functions ---
-
         function initTree() {
-            nodeIdCounter = 0;
-            pathDisplay.innerHTML = ""; // Reset path
+            nodeIdCounter = 0; pathDisplay.innerHTML = ""; 
             const input = document.getElementById('node-input').value;
             if (!input.trim()) return;
-            
-            // LOGIC CHANGE: UPPERCASE EVERY INPUT
-            const rawValues = input.split(',').map(s => s.trim().toUpperCase()).filter(s => s !== "");
-            if (rawValues.length === 0) return;
+            const raw = input.split(',').map(s => s.trim().toUpperCase()).filter(s => s !== "");
+            if (!raw.length) return;
+            const final = raw.map(v => (isNaN(parseFloat(v)) ? v : parseFloat(v)));
 
-            const finalValues = rawValues.map(v => {
-                const n = parseFloat(v);
-                return isNaN(n) ? v : n;
-            });
-
-            bstInstance = new BST();
-            finalValues.forEach(n => bstInstance.insert(n));
+            treeInstance = new Tree(isAVLMode);
+            final.forEach(n => treeInstance.insert(n));
 
             viewport.innerHTML = ''; 
-
             let xCounter = 0;
             const calcPos = (node, depth) => {
                 if (!node) return;
                 calcPos(node.left, depth + 1);
-                node.x = xCounter * X_GAP;
-                node.y = depth * Y_GAP;
+                node.x = xCounter * X_GAP; node.y = depth * Y_GAP;
                 xCounter++;
                 calcPos(node.right, depth + 1);
             };
 
-            if (bstInstance.root) {
-                calcPos(bstInstance.root, 0);
-                drawLinks(bstInstance.root);
-                drawNodes(bstInstance.root);
-                
-                const treeWidth = (xCounter) * X_GAP;
-                const maxDepth = getMaxDepth(bstInstance.root);
-                const treeHeight = (maxDepth + 1) * Y_GAP;
-                
-                smartFit(treeWidth, treeHeight);
+            if (treeInstance.root) {
+                calcPos(treeInstance.root, 0);
+                drawLinks(treeInstance.root);
+                drawNodes(treeInstance.root);
+                smartFit((xCounter) * X_GAP, (getMaxDepth(treeInstance.root) + 1) * Y_GAP);
                 searchBtn.disabled = false;
             } else {
                 searchBtn.disabled = true;
@@ -461,67 +374,50 @@
         }
 
         async function searchTree() {
-            if (!bstInstance || !bstInstance.root) return;
-
-            // LOGIC CHANGE: Force Uppercase on search
+            if (!treeInstance || !treeInstance.root) return;
             let inputVal = document.getElementById('search-input').value.trim().toUpperCase();
             if (!inputVal) return;
+            let searchVal = isNaN(parseFloat(inputVal)) ? inputVal : parseFloat(inputVal);
 
-            let searchVal = parseFloat(inputVal);
-            if (isNaN(searchVal)) searchVal = inputVal;
-
-            // Reset UI (Remove old highlights)
-            document.querySelectorAll('.node-circle').forEach(el => el.classList.remove('visited', 'found'));
-            document.querySelectorAll('.link').forEach(el => el.classList.remove('visited'));
+            resetHighlights();
             pathDisplay.innerHTML = "Searching...";
 
-            const result = bstInstance.getSearchData(searchVal);
+            const { pathNodes, leftCount, rightCount, found } = treeInstance.getSearchData(searchVal);
 
-            const { pathNodes, leftCount, rightCount, found } = result;
-
-            // Animate Path
             for (let i = 0; i < pathNodes.length; i++) {
                 const node = pathNodes[i];
                 const svgNode = document.getElementById(`circle-${node.id}`);
                 
-                if (i === pathNodes.length - 1 && found) {
-                    if (svgNode) svgNode.classList.add('found');
-                } else {
-                    if (svgNode) svgNode.classList.add('visited');
-                    
+                if (svgNode) {
+                    if (i === pathNodes.length - 1 && found) svgNode.classList.add('found');
+                    else svgNode.classList.add('visited');
+                }
+
+                if (i < pathNodes.length - 1) {
                     const nextNode = pathNodes[i+1];
-                    if (nextNode) {
-                        const linkId = `link-${node.id}-${nextNode.id}`;
-                        const svgLink = document.getElementById(linkId);
-                        if (svgLink) svgLink.classList.add('visited');
+                    const linkId = `link-${node.id}-${nextNode.id}`;
+                    const svgLink = document.getElementById(linkId);
+                    if (svgLink) {
+                        if (treeInstance.compare(nextNode.value, node.value) < 0) svgLink.classList.add('anim-left');
+                        else svgLink.classList.add('anim-right');
                     }
                 }
                 await new Promise(r => setTimeout(r, 400));
             }
-            
-            // DISPLAY LOGIC: Show Left/Right Counts
-            if (found) {
-                pathDisplay.innerHTML = `Found! Moves: <span class="count-left">${leftCount} Left</span>, <span class="count-right">${rightCount} Right</span>`;
-            } else {
-                pathDisplay.innerHTML = `Not Found. (Moves: ${leftCount} L, ${rightCount} R)`;
-            }
+            if (found) pathDisplay.innerHTML = `Found! Moves: <span class="count-left">${leftCount} Left</span>, <span class="count-right">${rightCount} Right</span>`;
+            else pathDisplay.innerHTML = `Not Found. (Moves: ${leftCount} L, ${rightCount} R)`;
         }
 
-        // LOGIC CHANGE: Handle Input to Clear Result
         function handleSearchInput() {
-            const input = document.getElementById('search-input');
-            // Force visual uppercase
-            input.value = input.value.toUpperCase();
-            
-            // Clear text
+            document.getElementById('search-input').value = document.getElementById('search-input').value.toUpperCase();
             pathDisplay.innerHTML = "";
-            
-            // Remove SVG highlights immediately
-            document.querySelectorAll('.node-circle').forEach(el => el.classList.remove('visited', 'found'));
-            document.querySelectorAll('.link').forEach(el => el.classList.remove('visited'));
+            resetHighlights();
         }
 
-        // --- Helpers ---
+        function resetHighlights() {
+            document.querySelectorAll('.node-circle').forEach(el => el.classList.remove('visited', 'found'));
+            document.querySelectorAll('.link').forEach(el => el.classList.remove('anim-left', 'anim-right'));
+        }
 
         function getMaxDepth(node) {
             if (!node) return 0;
@@ -530,23 +426,8 @@
 
         function drawLinks(node) {
             if (!node) return;
-            if (node.left) {
-                // Changed label to 'L'
-                createLine(node.x, node.y, node.left.x, node.left.y, node.id, node.left.id, "L");
-                drawLinks(node.left);
-            }
-            if (node.right) {
-                // Changed label to 'R'
-                createLine(node.x, node.y, node.right.x, node.right.y, node.id, node.right.id, "R");
-                drawLinks(node.right);
-            }
-        }
-
-        function drawNodes(node) {
-            if (!node) return;
-            createNode(node.x, node.y, node.value, node.id);
-            drawNodes(node.left);
-            drawNodes(node.right);
+            if (node.left) { createLine(node.x, node.y, node.left.x, node.left.y, node.id, node.left.id, "L"); drawLinks(node.left); }
+            if (node.right) { createLine(node.x, node.y, node.right.x, node.right.y, node.id, node.right.id, "R"); drawLinks(node.right); }
         }
 
         function createLine(x1, y1, x2, y2, startId, endId, label) {
@@ -557,108 +438,86 @@
             line.setAttribute("id", `link-${startId}-${endId}`);
             viewport.appendChild(line);
 
-            // Optional: Small label on line
-            const midX = (x1 + x2) / 2;
-            const midY = (y1 + y2) / 2;
-            const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
+            const g = document.createElementNS("http://www.w3.org/2000/svg", "g"); g.style.pointerEvents = "none";
             const bg = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            bg.setAttribute("cx", midX); bg.setAttribute("cy", midY);
-            bg.setAttribute("r", 6);
-            bg.setAttribute("class", "edge-label-bg");
-
+            bg.setAttribute("cx", midX); bg.setAttribute("cy", midY); bg.setAttribute("r", 6); bg.setAttribute("class", "edge-label-bg");
             const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            text.setAttribute("x", midX); text.setAttribute("y", midY);
-            text.setAttribute("dy", "0.5px");
-            text.setAttribute("class", "edge-label-text");
+            text.setAttribute("x", midX); text.setAttribute("y", midY); text.setAttribute("dy", "0.5px"); text.setAttribute("class", "edge-label-text");
             text.textContent = label;
+            g.appendChild(bg); g.appendChild(text); viewport.appendChild(g);
+        }
 
-            g.appendChild(bg); g.appendChild(text);
-            viewport.appendChild(g);
+        function drawNodes(node) {
+            if (!node) return;
+            createNode(node.x, node.y, node.value, node.id);
+            drawNodes(node.left); drawNodes(node.right);
         }
 
         function createNode(x, y, val, id) {
             const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
             g.setAttribute("class", "node-group animate-pop");
             g.style.animationDelay = `${y/Y_GAP * 50}ms`;
-
             const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            circle.setAttribute("cx", x); circle.setAttribute("cy", y);
-            circle.setAttribute("r", NODE_R);
-            circle.setAttribute("class", "node-circle");
-            circle.setAttribute("id", `circle-${id}`);
-
+            circle.setAttribute("cx", x); circle.setAttribute("cy", y); circle.setAttribute("r", NODE_R);
+            circle.setAttribute("class", "node-circle"); circle.setAttribute("id", `circle-${id}`);
             const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            text.setAttribute("x", x); text.setAttribute("y", y);
-            text.setAttribute("class", "node-text");
-            text.textContent = val;
-
-            g.appendChild(circle); g.appendChild(text);
-            viewport.appendChild(g);
+            text.setAttribute("x", x); text.setAttribute("y", y); text.setAttribute("class", "node-text"); text.textContent = val;
+            g.appendChild(circle); g.appendChild(text); viewport.appendChild(g);
         }
 
-        // --- Zoom & Pan ---
+        /* WBR (SmartFit) - Calculates scale based on canvas size */
         function smartFit(treeW, treeH) {
-            const canvasW = container.clientWidth;
-            const canvasH = container.clientHeight;
-            const scaleX = (canvasW - 60) / Math.max(treeW, 100);
-            const scaleY = (canvasH - 300) / Math.max(treeH, 100); 
-            let scale = Math.min(scaleX, scaleY, 1.2); 
-            if (scale < 0.1) scale = 0.1;
-            const treeCenterX = treeW / 2;
-            viewState.pX = (canvasW / 2) - (treeCenterX * scale);
-            viewState.pY = 280; 
-            viewState.scale = scale;
+            const w = container.clientWidth, h = container.clientHeight;
+            const padding = 60; 
+            // Scale to fit width or height, with a max zoom of 1.2
+            const scale = Math.min((w - padding) / Math.max(treeW, 100), (h - padding) / Math.max(treeH, 100), 1.2);
+            viewState.scale = Math.max(scale, 0.2);
+            // Center Horizontally
+            viewState.pX = (w - treeW * viewState.scale) / 2;
+            // Center Vertically
+            viewState.pY = (h - treeH * viewState.scale) / 2;
+            // Prevent top cut-off
+            viewState.pY = Math.max(viewState.pY, 40);
             updateTransform();
         }
 
-        function updateTransform() {
-            viewport.setAttribute("transform", `translate(${viewState.pX}, ${viewState.pY}) scale(${viewState.scale})`);
-        }
-
-        container.addEventListener('wheel', (e) => {
+        function updateTransform() { viewport.setAttribute("transform", `translate(${viewState.pX}, ${viewState.pY}) scale(${viewState.scale})`); }
+        
+        container.addEventListener('wheel', e => {
             e.preventDefault();
             const rect = container.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
             const worldX = (mouseX - viewState.pX) / viewState.scale;
             const worldY = (mouseY - viewState.pY) / viewState.scale;
-            
-            const s = 0.001;
-            let newScale = viewState.scale + (e.deltaY * -s * viewState.scale);
-            if (newScale < 0.1) newScale = 0.1;
-            if (newScale > 5) newScale = 5;
-
+            const zoomSensitivity = 0.001;
+            let newScale = viewState.scale + (e.deltaY * -zoomSensitivity * viewState.scale);
+            newScale = Math.max(0.05, Math.min(newScale, 10));
             viewState.pX = mouseX - worldX * newScale;
             viewState.pY = mouseY - worldY * newScale;
             viewState.scale = newScale;
             updateTransform();
         }, { passive: false });
 
-        container.addEventListener('mousedown', (e) => {
+        container.addEventListener('mousedown', e => {
             viewState.isDragging = true;
             viewState.startX = e.clientX - viewState.pX;
             viewState.startY = e.clientY - viewState.pY;
             container.style.cursor = "grabbing";
         });
-
-        window.addEventListener('mousemove', (e) => {
+        window.addEventListener('mousemove', e => {
             if (!viewState.isDragging) return;
             e.preventDefault();
             viewState.pX = e.clientX - viewState.startX;
             viewState.pY = e.clientY - viewState.startY;
             updateTransform();
         });
-
-        window.addEventListener('mouseup', () => {
-            viewState.isDragging = false;
-            container.style.cursor = "grab";
-        });
+        window.addEventListener('mouseup', () => { viewState.isDragging = false; container.style.cursor = "grab"; });
 
         document.getElementById('node-input').addEventListener('keypress', (e) => { if(e.key === "Enter") initTree(); });
         document.getElementById('search-input').addEventListener('keypress', (e) => { if(e.key === "Enter" && !searchBtn.disabled) searchTree(); });
-
         window.onload = () => setTimeout(initTree, 50);
-
     </script>
 </body>
 </html>
