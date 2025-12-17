@@ -127,6 +127,17 @@
         /* --- CONTROLS --- */
         .row-top { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px; }
         .header-left { display: flex; align-items: center; gap: 8px; }
+        
+        /* NEW HOME BUTTON STYLE */
+        .home-btn {
+            display: flex; align-items: center; justify-content: center;
+            text-decoration: none; font-size: 1.2rem; margin-right: 4px;
+            width: 32px; height: 32px; border-radius: 8px;
+            background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+            transition: all 0.2s;
+        }
+        .home-btn:hover { background: var(--accent); transform: scale(1.1); border-color: transparent; }
+
         h1 { margin: 0; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 1.1rem; background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; white-space: nowrap; }
         
         .theme-toggle { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-main); padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
@@ -218,6 +229,7 @@
         <div class="glass-panel">
             <div class="row-top">
                 <div class="header-left">
+                    <a href="https://rayantion.me" class="home-btn" title="Return Home">🏠</a>
                     <h1>Tree Visualizer</h1>
                     <button class="theme-toggle" onclick="toggleTheme()">🌗 Theme</button>
                 </div>
@@ -623,12 +635,6 @@
                 
                 if (d.type === 'eraser') {
                     ctx.globalCompositeOperation = 'destination-out';
-                    ctx.lineWidth = d.size / viewState.scale; // Maintain visual size? No, keep logic size
-                    // Actually, erasing in vector space is hard. 
-                    // Simpler: Eraser paints background color or uses composite on a buffer.
-                    // For this visualizer, let's treat eraser as white paint for simplicity,
-                    // OR use destination-out if we want true transparency clearing.
-                    // NOTE: destination-out clears canvas pixels. It works here!
                     ctx.lineWidth = d.size;
                 } else {
                     ctx.globalCompositeOperation = 'source-over';
