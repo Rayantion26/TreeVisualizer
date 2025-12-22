@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tree Visualizer | Sync Drawing</title>
+    <title>Tree Visualizer | Final Fix</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com/css2">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -71,23 +71,17 @@
             pointer-events: none; 
         }
 
-        /* --- FULL SCREEN CANVAS --- */
         #container-wrapper { 
-            position: absolute; 
-            top: 0; left: 0; width: 100%; height: 100%; 
-            z-index: 1; 
-            overflow: hidden; 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            z-index: 1; overflow: hidden; 
         }
         #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
         
         #draw-layer { 
             width: 100%; height: 100%; position: absolute; top: 0; left: 0; 
-            z-index: 2; 
-            pointer-events: auto; 
-            touch-action: none; 
+            z-index: 2; pointer-events: auto; touch-action: none; 
         }
 
-        /* --- UI LAYERS --- */
         .ui-layer {
             position: absolute; top: 0; left: 0; width: 100%;
             display: flex; justify-content: center;
@@ -109,8 +103,17 @@
 
         /* --- TOOLBAR --- */
         .toolbar-layer {
-            position: absolute; right: 20px; top: 20px; z-index: 30;
+            position: absolute; 
+            /* Default Desktop: Top Right */
+            right: 20px; top: 20px; 
+            z-index: 30;
             pointer-events: none; 
+        }
+
+        /* Helper class for Mobile Layout Pinning */
+        .toolbar-layer.pinned-mobile {
+            top: 50%; right: 10px; left: auto; bottom: auto;
+            transform: translateY(-50%);
         }
 
         .draw-tools {
@@ -124,7 +127,7 @@
         }
 
         .drag-handle {
-            width: 100%; height: 24px; /* Taller for easier touch */
+            width: 100%; height: 30px; /* Larger hit area */
             cursor: grab;
             display: flex; justify-content: center; align-items: center;
             opacity: 0.5; touch-action: none;
@@ -226,7 +229,7 @@
         .path-status { 
             width: 100%; font-family: 'monospace'; font-size: 0.9rem; font-weight: 600; 
             color: var(--text-main); text-align: center; padding-top: 8px; 
-            border-top: none; /* REMOVED DOTTED LINE */
+            border-top: none;
         }
         .count-left { color: var(--anim-left); }
         .count-right { color: var(--anim-right); }
@@ -275,21 +278,13 @@
             .btn-action { padding: 0 12px; font-size: 0.8rem; height: 36px; }
             #node-input { font-size: 0.85rem; }
             
-            /* FIXED TOOLBAR POSITIONING FOR MOBILE */
-            .toolbar-layer { 
-                top: 50% !important; 
-                right: 10px !important;
-                transform: translateY(-50%); 
-                left: auto !important; 
-                bottom: auto !important;
-            }
+            /* Remove inline default styles, use class for initial placement */
             .draw-tools { width: 44px; gap: 6px; padding: 6px; }
             .tool-btn { width: 30px; height: 30px; padding: 5px; }
             .size-dragger { width: 30px; height: 30px; }
             .mini-slider { width: 30px; }
-            .drag-handle { height: 24px; } /* Bigger touch target */
+            .drag-handle { height: 24px; }
 
-            /* Hide Guide Text on Mobile */
             .hint-overlay { display: none; }
         }
     </style>
@@ -298,7 +293,7 @@
 
     <div id="brush-cursor"></div>
 
-    <div class="toolbar-layer">
+    <div class="toolbar-layer pinned-mobile">
         <div class="draw-tools" id="toolbar">
             <div class="drag-handle" id="toolbar-drag">
                 <div class="drag-dots"></div>
@@ -579,16 +574,14 @@
                 drawLinks(treeInstance.root);
                 drawNodes(treeInstance.root);
                 
-                // DYNAMIC SMART FIT FOR MOBILE
+                // DYNAMIC SMART FIT
                 // Calculate actual header height to ensure tree spawns below it
                 let startY = 40;
                 const panel = document.querySelector('.glass-panel');
                 if (panel) {
                     const rect = panel.getBoundingClientRect();
-                    // If on mobile (or panel taking up significant space), start below it
-                    if(rect.bottom > 50) {
-                        startY = rect.bottom + 50; 
-                    }
+                    // Spawn 50px below the header panel
+                    startY = rect.bottom + 50; 
                 }
                 
                 smartFit((xCounter) * X_GAP, (getMaxDepth(treeInstance.root) + 1) * Y_GAP, startY);
@@ -698,14 +691,10 @@
             const scale = Math.min((w - padding) / Math.max(treeW, 100), (h - padding) / Math.max(treeH, 100), 1.2);
             viewState.scale = Math.max(scale, 0.2);
             viewState.pX = (w - treeW * viewState.scale) / 2;
+            viewState.pY = (h - treeH * viewState.scale) / 2;
             
-            // Set Y to exactly offset, don't try to center vertically on mobile
-            // unless tree is very small
-            if (offsetY > 100) {
-                viewState.pY = offsetY;
-            } else {
-                viewState.pY = Math.max((h - treeH * viewState.scale) / 2, offsetY); 
-            }
+            // Respect the calculated Y offset (below the header)
+            viewState.pY = Math.max(viewState.pY, offsetY); 
             
             updateTransform();
         }
@@ -936,28 +925,31 @@
         let tbOffsetX, tbOffsetY; 
 
         function startTbDrag(e) {
+            e.preventDefault(); // Stop scroll immediately on touch
             isDraggingToolbar = true;
             const pos = getPointerPos(e);
             
+            // Get the element wrapper
             const layer = document.querySelector('.toolbar-layer');
             const rect = layer.getBoundingClientRect();
             
-            // CRITICAL FIX: Reset transform/right immediately
-            layer.style.right = 'auto';
-            layer.style.bottom = 'auto';
-            layer.style.transform = 'none'; 
+            // 1. Remove the "pinned-mobile" class to stop CSS enforcement
+            layer.classList.remove('pinned-mobile');
             
-            // Force set absolute coordinates to current visual spot
+            // 2. Set explicit pixel values to current visual location so it doesn't jump
             layer.style.left = rect.left + 'px';
             layer.style.top = rect.top + 'px';
+            layer.style.right = 'auto'; // Clear right
+            layer.style.bottom = 'auto'; // Clear bottom
             
-            // Calculate offset relative to corner of the bar
+            // 3. Calculate offset of finger from top-left corner
             tbOffsetX = pos.x - rect.left;
             tbOffsetY = pos.y - rect.top;
             
             document.body.style.cursor = 'grabbing';
             handle.style.cursor = 'grabbing';
         }
+
         function moveTbDrag(e) {
             if(isDraggingToolbar) {
                 e.preventDefault();
