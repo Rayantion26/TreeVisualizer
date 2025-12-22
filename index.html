@@ -26,6 +26,7 @@
             --anim-left: #f97316;
             --anim-right: #3b82f6;
             --found-color: #22c55e;
+            --icon-color: #475569;
         }
 
         [data-theme="dark"] {
@@ -43,18 +44,20 @@
             --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
             --anim-left: #fb923c;
             --anim-right: #60a5fa;
+            --icon-color: #cbd5e1;
         }
 
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
         body {
             font-family: 'Roboto', sans-serif;
             background-color: var(--bg-color);
             color: var(--text-main);
             margin: 0; padding: 0;
-            height: 100vh; overflow: hidden;
-            display: flex; flex-direction: column;
-            user-select: none; /* Prevent text selection while dragging */
+            height: 100vh; width: 100vw;
+            overflow: hidden;
+            user-select: none;
+            touch-action: none;
         }
 
         body::before {
@@ -65,14 +68,32 @@
             background-size: 40px 40px;
             z-index: -1;
             mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+            pointer-events: none; 
+        }
+
+        /* --- FULL SCREEN CANVAS --- */
+        #container-wrapper { 
+            position: absolute; 
+            top: 0; left: 0; width: 100%; height: 100%; 
+            z-index: 1; 
+            overflow: hidden; 
+        }
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        #draw-layer { 
+            width: 100%; height: 100%; position: absolute; top: 0; left: 0; 
+            z-index: 2; 
+            pointer-events: auto; 
+            touch-action: none; 
         }
 
         /* --- UI LAYERS --- */
         .ui-layer {
-            position: relative; width: 100%;
+            position: absolute; top: 0; left: 0; width: 100%;
             display: flex; justify-content: center;
-            padding: 15px 15px 0 15px;
+            padding: 15px;
             z-index: 10;
+            pointer-events: none;
         }
 
         .glass-panel {
@@ -81,54 +102,95 @@
             border: 1px solid var(--glass-border);
             border-radius: 16px; padding: 15px 20px;
             box-shadow: var(--shadow);
-            width: 100%; max-width: 600px;
+            width: 100%; max-width: 650px;
             display: flex; flex-direction: column; align-items: center; gap: 12px;
-            height: auto; transition: height 0.1s ease; 
+            pointer-events: auto;
         }
 
-        /* --- VERTICAL TOOLBAR --- */
+        /* --- TOOLBAR --- */
         .toolbar-layer {
             position: absolute; right: 20px; top: 20px; z-index: 30;
-            display: flex; flex-direction: column; gap: 10px;
+            pointer-events: none; 
         }
 
         .draw-tools {
             background: var(--glass-bg); backdrop-filter: blur(12px);
             border: 1px solid var(--glass-border); border-radius: 12px;
-            padding: 12px 8px; box-shadow: var(--shadow);
+            padding: 8px; box-shadow: var(--shadow);
             display: flex; flex-direction: column; align-items: center;
-            gap: 8px; width: 50px;
+            gap: 10px; width: 56px; 
+            pointer-events: auto; 
+            position: relative; 
+        }
+
+        .drag-handle {
+            width: 100%; height: 24px; /* Taller for easier touch */
+            cursor: grab;
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0.5; touch-action: none;
+        }
+        .drag-handle:active { cursor: grabbing; }
+        .drag-dots {
+            width: 20px; height: 6px;
+            border-top: 2px dotted var(--icon-color);
+            border-bottom: 2px dotted var(--icon-color);
         }
 
         .tool-btn {
-            background: transparent; border: none; color: var(--text-main);
-            font-size: 1.2rem; cursor: pointer; padding: 6px;
+            background: transparent; border: none; color: var(--icon-color);
+            cursor: pointer; padding: 6px;
             border-radius: 6px; transition: 0.2s; 
-            width: 36px; height: 36px;
+            width: 38px; height: 38px;
             display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
         }
-        .tool-btn:hover { background: rgba(0,0,0,0.05); }
+        .tool-btn svg { width: 22px; height: 22px; fill: currentColor; }
+        .tool-btn:hover { background: rgba(0,0,0,0.05); color: var(--accent); }
         .tool-btn.active { background: var(--accent); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .tool-btn.active svg { fill: white; }
         
-        .separator { width: 80%; height: 1px; background: var(--line-color); margin: 2px 0; opacity: 0.5; }
+        .separator { width: 70%; height: 1px; background: var(--line-color); opacity: 0.3; margin: 2px 0; flex-shrink: 0;}
 
         input[type="color"] {
-            -webkit-appearance: none; border: none; width: 28px; height: 28px;
+            -webkit-appearance: none; border: none; width: 32px; height: 32px;
             border-radius: 50%; padding: 0; overflow: hidden; cursor: pointer; background: none;
+            transition: transform 0.2s; flex-shrink: 0;
         }
         input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
         input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; border: 2px solid var(--glass-border); }
 
-        input[type=range] {
-            writing-mode: bt-lr; -webkit-appearance: slider-vertical;
-            width: 8px; height: 60px; padding: 0 5px; cursor: ns-resize;
+        .size-group { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; }
+
+        .size-dragger {
+            width: 38px; height: 34px;
+            background: rgba(0,0,0,0.03);
+            border: 1px solid var(--glass-border); border-radius: 6px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: ew-resize; user-select: none; touch-action: none;
+            transition: all 0.2s;
+        }
+        .size-dragger:hover, .size-dragger.dragging { background: var(--accent); border-color: transparent; }
+        .size-dragger:hover span, .size-dragger.dragging span { color: white; }
+        .size-dragger span { font-size: 8px; font-weight: 700; color: var(--text-main); line-height: 1; pointer-events: none; }
+        .size-dragger .val { font-size: 11px; margin-top: 1px; }
+
+        .mini-slider {
+            -webkit-appearance: none; width: 40px; height: 14px; border-radius: 2px;
+            background: transparent; outline: none; cursor: pointer; position: relative;
+        }
+        .mini-slider::after {
+            content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 2px; 
+            background: var(--glass-border); transform: translateY(-50%); z-index: -1;
+        }
+        .mini-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+            background: var(--accent); cursor: pointer; border: 2px solid var(--bg-color);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
         }
 
-        /* --- CONTROLS --- */
-        .row-top { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px; }
-        .header-left { display: flex; align-items: center; gap: 8px; }
+        .row-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; width: 100%; gap: 10px; }
+        .header-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         
-        /* HOME BUTTON - UPDATED TO BE SAFE */
         .home-btn {
             display: flex; align-items: center; justify-content: center;
             text-decoration: none; font-size: 1.2rem; margin-right: 4px;
@@ -136,43 +198,39 @@
             background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
             transition: all 0.2s;
         }
-        .home-btn:hover { background: var(--accent); transform: scale(1.1); border-color: transparent; }
-
+        
         h1 { margin: 0; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 1.1rem; background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; white-space: nowrap; }
         
         .theme-toggle { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-main); padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
-        .mode-switch { display: flex; background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: 8px; overflow: hidden; cursor: pointer; height: 32px; min-width: 120px; }
-        .mode-option { flex: 1; padding: 0 5px; text-align: center; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 0.75rem; transition: all 0.2s; color: var(--text-main); background: transparent; border: none; opacity: 0.5; white-space: nowrap; }
+        
+        .mode-switch { display: flex; background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: 8px; overflow: hidden; cursor: pointer; height: 32px; min-width: 150px; flex-shrink: 0; }
+        .mode-option { flex: 1; padding: 0 8px; text-align: center; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 0.75rem; transition: all 0.2s; color: var(--text-main); background: transparent; border: none; opacity: 0.5; white-space: nowrap; }
         .mode-option:hover { background: rgba(0,0,0,0.05); opacity: 1; }
         .mode-option.active { background: var(--accent); color: white; opacity: 1; }
 
-        .input-row { display: flex; gap: 8px; align-items: flex-start; width: 100%; justify-content: center; }
+        .input-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; width: 100%; justify-content: center; }
         input[type="text"], textarea { border-radius: 8px; border: 1px solid var(--glass-border); background: var(--input-bg); color: var(--text-main); outline: none; font-family: 'Roboto', sans-serif; font-size: 0.9rem; transition: all 0.1s; text-transform: uppercase; }
-        input:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.2); }
-
-        #node-input { width: 160px; text-align: center; padding: 8px 12px; min-height: 36px; height: 36px; resize: none; overflow: hidden; line-height: 1.3; display: block; } 
+        
+        #node-input { 
+            flex-grow: 1; width: auto; min-width: 150px;
+            text-align: center; padding: 8px 12px; 
+            min-height: 36px; height: 36px; 
+            resize: none; overflow: hidden; line-height: 1.3; display: block; 
+        } 
         #search-input { width: 80px; text-align: center; padding: 0 12px; height: 36px; }
 
         .btn-action { padding: 0 15px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: 700; font-family: 'Montserrat', sans-serif; cursor: pointer; transition: all 0.2s; white-space: nowrap; font-size: 0.85rem; height: 36px; }
-        .btn-action:hover { filter: brightness(1.1); transform: translateY(-1px); }
-        .btn-action:active { transform: translateY(0); }
         .btn-search { background-color: #10b981; }
         .btn-action:disabled { background-color: var(--line-color); opacity: 0.5; cursor: not-allowed; }
 
-        .path-status { width: 100%; font-family: 'monospace'; font-size: 0.9rem; font-weight: 600; color: var(--text-main); text-align: center; padding-top: 8px; border-top: 1px dashed var(--glass-border); }
+        .path-status { 
+            width: 100%; font-family: 'monospace'; font-size: 0.9rem; font-weight: 600; 
+            color: var(--text-main); text-align: center; padding-top: 8px; 
+            border-top: none; /* REMOVED DOTTED LINE */
+        }
         .count-left { color: var(--anim-left); }
         .count-right { color: var(--anim-right); }
 
-        /* --- CANVAS --- */
-        #container-wrapper { flex: 1; width: 100%; position: relative; overflow: hidden; }
-        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
-        
-        #draw-layer { 
-            width: 100%; height: 100%; position: absolute; top: 0; left: 0; 
-            z-index: 2; /* Drawing sits on top */
-        }
-
-        /* --- CUSTOM CURSOR --- */
         #brush-cursor {
             position: fixed; top: 0; left: 0;
             border: 2px solid var(--text-main); border-radius: 50%;
@@ -182,12 +240,15 @@
             mix-blend-mode: difference;
         }
 
-        .hint-overlay { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 0.85rem; color: var(--text-main); opacity: 0.6; pointer-events: none; user-select: none; background: var(--glass-bg); padding: 8px 16px; border-radius: 20px; border: 1px solid var(--glass-border); font-weight: 500; z-index: 5; }
+        .hint-overlay { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 0.85rem; color: var(--text-main); opacity: 0.6; pointer-events: none; user-select: none; background: var(--glass-bg); padding: 8px 16px; border-radius: 20px; border: 1px solid var(--glass-border); font-weight: 500; z-index: 5; text-align: center; width: 90%; }
 
         /* SVG Styles */
         .node-group { cursor: pointer; }
         .node-circle { fill: var(--node-bg); stroke: var(--node-border); stroke-width: 2.5px; transition: all 0.4s ease; }
         .node-text { fill: var(--node-text); font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 13px; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+        .node-circle.red { fill: #ef4444 !important; stroke: #b91c1c !important; }
+        .node-circle.black { fill: #171717 !important; stroke: #404040 !important; }
+        .node-group.rbt-mode .node-text { fill: #ffffff !important; }
         .link { fill: none; stroke: var(--line-color); stroke-width: 2px; stroke-linecap: round; transition: stroke 0.4s ease, stroke-width 0.4s ease; }
         .edge-label-bg { fill: var(--bg-color); stroke: var(--line-color); stroke-width: 1px; }
         .edge-label-text { font-size: 9px; fill: var(--text-main); font-family: 'Roboto Mono', monospace; text-anchor: middle; dominant-baseline: middle; font-weight: bold; }
@@ -195,10 +256,42 @@
         .node-circle.found { stroke: var(--found-color) !important; fill: #f0fdf4 !important; transform-box: fill-box; transform-origin: center; transform: scale(1.3); }
         [data-theme="dark"] .node-circle.visited { fill: #1e1b4b; }
         [data-theme="dark"] .node-circle.found { fill: #052e16 !important; }
+        .node-circle.red.found { stroke: #fbbf24 !important; stroke-width: 4px; }
+        .node-circle.black.found { stroke: #22c55e !important; stroke-width: 4px; }
         .link.anim-left { stroke: var(--anim-left) !important; stroke-width: 4px; filter: drop-shadow(0 0 3px var(--anim-left)); }
         .link.anim-right { stroke: var(--anim-right) !important; stroke-width: 4px; filter: drop-shadow(0 0 3px var(--anim-right)); }
         .animate-pop { transform-box: fill-box; transform-origin: center; animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; opacity: 0; }
         @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        /* --- MOBILE LAYOUT ADJUSTMENTS --- */
+        @media (max-width: 768px) {
+            .glass-panel { padding: 10px; width: 95%; margin-top: 10px; gap: 8px; }
+            h1 { font-size: 1rem; }
+            .row-top { gap: 8px; }
+            .header-left { flex: 1; min-width: 150px; }
+            
+            .mode-switch { flex: 1; min-width: 140px; }
+            .input-row { gap: 6px; }
+            .btn-action { padding: 0 12px; font-size: 0.8rem; height: 36px; }
+            #node-input { font-size: 0.85rem; }
+            
+            /* FIXED TOOLBAR POSITIONING FOR MOBILE */
+            .toolbar-layer { 
+                top: 50% !important; 
+                right: 10px !important;
+                transform: translateY(-50%); 
+                left: auto !important; 
+                bottom: auto !important;
+            }
+            .draw-tools { width: 44px; gap: 6px; padding: 6px; }
+            .tool-btn { width: 30px; height: 30px; padding: 5px; }
+            .size-dragger { width: 30px; height: 30px; }
+            .mini-slider { width: 30px; }
+            .drag-handle { height: 24px; } /* Bigger touch target */
+
+            /* Hide Guide Text on Mobile */
+            .hint-overlay { display: none; }
+        }
     </style>
 </head>
 <body>
@@ -206,22 +299,62 @@
     <div id="brush-cursor"></div>
 
     <div class="toolbar-layer">
-        <div class="draw-tools">
-            <button class="tool-btn active" onclick="setTool('hand')" title="Move Tree (Right/Middle Click also works)">✋</button>
+        <div class="draw-tools" id="toolbar">
+            <div class="drag-handle" id="toolbar-drag">
+                <div class="drag-dots"></div>
+            </div>
+
+            <button class="tool-btn active" onclick="setTool('hand')" title="Pan">
+                <svg viewBox="0 0 24 24"><path d="M23 5.5V20c0 2.2-1.8 4-4 4h-7.3c-1.08 0-2.1-.43-2.85-1.19L1 14.83s1.26-1.23 1.3-1.25c.22-.19.49-.29.79-.29.22 0 .42.06.6.16l.41.25.1.05v-5.2c0-1.1.9-2 2-2s2 .9 2 2v2.5h1v-4c0-1.1.9-2 2-2s2 .9 2 2v4h1v-3.5c0-1.1.9-2 2-2s2 .9 2 2v3.5h1v-2c0-1.1.9-2 2-2s2 .9 2 2v2z"/></svg>
+            </button>
+            
             <div class="separator"></div>
+            
             <input type="color" id="draw-color" value="#ff0000" title="Color">
             
-            <input type="range" id="size-slider" min="2" max="50" value="5" title="Size">
+            <div class="size-group">
+                <div class="size-dragger" id="size-dragger" title="Drag to Resize">
+                    <span>SIZE</span>
+                    <span class="val" id="size-val">5</span>
+                </div>
+                <input type="range" id="mini-slider" class="mini-slider" min="1" max="100" value="5" title="Size Slider">
+            </div>
 
-            <button class="tool-btn" onclick="setTool('pen')" title="Pen">✎</button>
-            <button class="tool-btn" onclick="setTool('marker')" title="Highlighter">🖊</button>
-            <button class="tool-btn" onclick="setTool('eraser')" title="Eraser">⌫</button>
             <div class="separator"></div>
-            <button class="tool-btn" onclick="setTool('box')" title="Box">⬜</button>
-            <button class="tool-btn" onclick="setTool('circle')" title="Circle">◯</button>
-            <button class="tool-btn" onclick="setTool('arrow')" title="Arrow">↗</button>
+
+            <button class="tool-btn" onclick="setTool('pen')" title="Pen">
+                <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </button>
+            <button class="tool-btn" onclick="setTool('marker')" title="Highlighter">
+                <svg viewBox="0 0 24 24"><path d="M18.5 1.15c-.53 0-1.04.19-1.43.58l-10.49 10.49c-.39.39-.58.9-.58 1.43v5.85h5.85c.53 0 1.04-.19 1.43-.58l10.49-10.49c.76-.76.76-2.03 0-2.79l-4.47-4.49c-.2-.2-.51-.2-.71 0zm-12 15.35h-3v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-3.5z"/></svg>
+            </button>
+            <button class="tool-btn" onclick="setTool('eraser')" title="Eraser">
+                <svg viewBox="0 0 24 24"><path d="M16.24 3.56l4.95 4.94c.78.79.78 2.05 0 2.84L12 20.53a4.008 4.008 0 0 1-5.66 0L2.81 17c-.78-.79-.78-2.05 0-2.84l10.6-10.6c.79-.78 2.05-.78 2.83 0zM4.22 15.58l3.54 3.53c.78.79 2.04.79 2.83 0l1.41-1.41-6.36-6.36-1.42 1.41c-.78.79-.78 2.05 0 2.83z"/></svg>
+            </button>
+            
             <div class="separator"></div>
-            <button class="tool-btn" onclick="clearDrawings()" title="Clear All">🗑</button>
+            
+            <button class="tool-btn" onclick="setTool('box')" title="Rectangle">
+                <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3m2 2v14h14V5H5z"/></svg>
+            </button>
+            <button class="tool-btn" onclick="setTool('circle')" title="Ellipse">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+            </button>
+            <button class="tool-btn" onclick="setTool('arrow')" title="Arrow">
+                <svg viewBox="0 0 24 24"><path d="M16.01 11H4v2h12.01v3L20 12l-3.99-4z"/></svg>
+            </button>
+            
+            <div class="separator"></div>
+            
+            <button class="tool-btn" onclick="undo()" title="Undo">
+                <svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+            </button>
+            <button class="tool-btn" onclick="redo()" title="Redo">
+                <svg viewBox="0 0 24 24"><path d="M18.4 10.6C16.55 9 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/></svg>
+            </button>
+            <button class="tool-btn" onclick="clearDrawings()" title="Clear">
+                <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            </button>
         </div>
     </div>
 
@@ -236,6 +369,7 @@
                 <div class="mode-switch">
                     <button id="mode-bst" class="mode-option active" onclick="setMode('BST')">BST</button>
                     <button id="mode-avl" class="mode-option" onclick="setMode('AVL')">AVL</button>
+                    <button id="mode-rbt" class="mode-option" onclick="setMode('RBT')">RBT</button>
                 </div>
             </div>
 
@@ -273,12 +407,13 @@
         }
 
         let nodeIdCounter = 0; 
-        let isAVLMode = false;
+        let treeMode = 'BST'; 
 
         function setMode(mode) {
-            isAVLMode = (mode === 'AVL');
-            document.getElementById('mode-bst').classList.toggle('active', !isAVLMode);
-            document.getElementById('mode-avl').classList.toggle('active', isAVLMode);
+            treeMode = mode;
+            document.getElementById('mode-bst').classList.toggle('active', mode === 'BST');
+            document.getElementById('mode-avl').classList.toggle('active', mode === 'AVL');
+            document.getElementById('mode-rbt').classList.toggle('active', mode === 'RBT');
             initTree();
         }
 
@@ -288,11 +423,16 @@
                 this.id = nodeIdCounter++; this.value = val;
                 this.left = null; this.right = null;
                 this.height = 1; this.x = 0; this.y = 0;
+                this.color = 'RED'; 
+                this.parent = null; 
             }
         }
 
         class Tree {
-            constructor(isAVL) { this.root = null; this.isAVL = isAVL; }
+            constructor(mode) { 
+                this.root = null; 
+                this.mode = mode; 
+            }
             compare(a, b) {
                 const numA = parseFloat(a), numB = parseFloat(b);
                 if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
@@ -314,13 +454,18 @@
                 y.height = Math.max(this.getHeight(y.left), this.getHeight(y.right)) + 1;
                 return y;
             }
-            insert(val) { this.root = this.insertNode(this.root, val); }
+            insert(val) { 
+                if (this.mode === 'RBT') {
+                    this.insertRBT(val);
+                } else {
+                    this.root = this.insertNode(this.root, val); 
+                }
+            }
             insertNode(node, val) {
                 if (!node) return new Node(val);
                 if (this.compare(val, node.value) < 0) node.left = this.insertNode(node.left, val);
                 else node.right = this.insertNode(node.right, val);
-
-                if (!this.isAVL) return node;
+                if (this.mode !== 'AVL') return node;
                 node.height = 1 + Math.max(this.getHeight(node.left), this.getHeight(node.right));
                 let balance = this.getBalance(node);
                 if (balance > 1 && this.compare(val, node.left.value) < 0) return this.rightRotate(node);
@@ -328,6 +473,66 @@
                 if (balance > 1 && this.compare(val, node.left.value) > 0) { node.left = this.leftRotate(node.left); return this.rightRotate(node); }
                 if (balance < -1 && this.compare(val, node.right.value) < 0) { node.right = this.rightRotate(node.right); return this.leftRotate(node); }
                 return node;
+            }
+            insertRBT(val) {
+                let newNode = new Node(val);
+                let y = null; let x = this.root;
+                while (x !== null) {
+                    y = x;
+                    if (this.compare(newNode.value, x.value) < 0) x = x.left;
+                    else x = x.right;
+                }
+                newNode.parent = y;
+                if (y === null) this.root = newNode;
+                else if (this.compare(newNode.value, y.value) < 0) y.left = newNode;
+                else y.right = newNode;
+                newNode.left = null; newNode.right = null; newNode.color = 'RED'; 
+                this.fixInsertRBT(newNode);
+            }
+            rotateLeftRBT(x) {
+                let y = x.right; x.right = y.left;
+                if (y.left !== null) y.left.parent = x;
+                y.parent = x.parent;
+                if (x.parent === null) this.root = y;
+                else if (x === x.parent.left) x.parent.left = y;
+                else x.parent.right = y;
+                y.left = x; x.parent = y;
+            }
+            rotateRightRBT(y) {
+                let x = y.left; y.left = x.right;
+                if (x.right !== null) x.right.parent = y;
+                x.parent = y.parent;
+                if (y.parent === null) this.root = x;
+                else if (y === y.parent.right) y.parent.right = x;
+                else y.parent.left = x;
+                x.right = y; y.parent = x;
+            }
+            fixInsertRBT(k) {
+                while (k.parent && k.parent.color === 'RED') {
+                    if (k.parent === k.parent.parent.right) {
+                        let u = k.parent.parent.left; 
+                        if (u && u.color === 'RED') {
+                            u.color = 'BLACK'; k.parent.color = 'BLACK';
+                            k.parent.parent.color = 'RED'; k = k.parent.parent;
+                        } else {
+                            if (k === k.parent.left) { k = k.parent; this.rotateRightRBT(k); }
+                            k.parent.color = 'BLACK'; k.parent.parent.color = 'RED';
+                            this.rotateLeftRBT(k.parent.parent);
+                        }
+                    } else {
+                        let u = k.parent.parent.right;
+                        if (u && u.color === 'RED') {
+                            u.color = 'BLACK'; k.parent.color = 'BLACK';
+                            k.parent.parent.color = 'RED'; k = k.parent.parent;
+                        } else {
+                            if (k === k.parent.right) { k = k.parent; this.rotateLeftRBT(k); }
+                            k.parent.color = 'BLACK'; k.parent.parent.color = 'RED';
+                            this.rotateRightRBT(k.parent.parent);
+                        }
+                    }
+                    if (k === this.root) break;
+                }
+                this.root.color = 'BLACK';
             }
             getSearchData(val) {
                 const pathNodes = [];
@@ -358,10 +563,8 @@
             const raw = input.value.split(',').map(s => s.trim().toUpperCase()).filter(s => s !== "");
             if (!raw.length) return;
             const final = raw.map(v => (isNaN(parseFloat(v)) ? v : parseFloat(v)));
-
-            treeInstance = new Tree(isAVLMode);
+            treeInstance = new Tree(treeMode);
             final.forEach(n => treeInstance.insert(n));
-
             viewport.innerHTML = ''; 
             let xCounter = 0;
             const calcPos = (node, depth) => {
@@ -371,12 +574,24 @@
                 xCounter++;
                 calcPos(node.right, depth + 1);
             };
-
             if (treeInstance.root) {
                 calcPos(treeInstance.root, 0);
                 drawLinks(treeInstance.root);
                 drawNodes(treeInstance.root);
-                smartFit((xCounter) * X_GAP, (getMaxDepth(treeInstance.root) + 1) * Y_GAP);
+                
+                // DYNAMIC SMART FIT FOR MOBILE
+                // Calculate actual header height to ensure tree spawns below it
+                let startY = 40;
+                const panel = document.querySelector('.glass-panel');
+                if (panel) {
+                    const rect = panel.getBoundingClientRect();
+                    // If on mobile (or panel taking up significant space), start below it
+                    if(rect.bottom > 50) {
+                        startY = rect.bottom + 50; 
+                    }
+                }
+                
+                smartFit((xCounter) * X_GAP, (getMaxDepth(treeInstance.root) + 1) * Y_GAP, startY);
                 searchBtn.disabled = false;
             } else {
                 searchBtn.disabled = true;
@@ -388,21 +603,16 @@
             let inputVal = document.getElementById('search-input').value.trim().toUpperCase();
             if (!inputVal) return;
             let searchVal = isNaN(parseFloat(inputVal)) ? inputVal : parseFloat(inputVal);
-
             resetHighlights();
             pathDisplay.innerHTML = "Searching...";
-
             const { pathNodes, leftCount, rightCount, found } = treeInstance.getSearchData(searchVal);
-
             for (let i = 0; i < pathNodes.length; i++) {
                 const node = pathNodes[i];
                 const svgNode = document.getElementById(`circle-${node.id}`);
-                
                 if (svgNode) {
                     if (i === pathNodes.length - 1 && found) svgNode.classList.add('found');
                     else svgNode.classList.add('visited');
                 }
-
                 if (i < pathNodes.length - 1) {
                     const nextNode = pathNodes[i+1];
                     const linkId = `link-${node.id}-${nextNode.id}`;
@@ -447,7 +657,6 @@
             line.setAttribute("class", "link");
             line.setAttribute("id", `link-${startId}-${endId}`);
             viewport.appendChild(line);
-
             const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
             const g = document.createElementNS("http://www.w3.org/2000/svg", "g"); g.style.pointerEvents = "none";
             const bg = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -460,149 +669,195 @@
 
         function drawNodes(node) {
             if (!node) return;
-            createNode(node.x, node.y, node.value, node.id);
+            createNode(node);
             drawNodes(node.left); drawNodes(node.right);
         }
 
-        function createNode(x, y, val, id) {
+        function createNode(node) {
             const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
             g.setAttribute("class", "node-group animate-pop");
-            g.style.animationDelay = `${y/Y_GAP * 50}ms`;
+            if (treeMode === 'RBT') g.classList.add('rbt-mode');
+            g.style.animationDelay = `${node.y/Y_GAP * 50}ms`;
             const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            circle.setAttribute("cx", x); circle.setAttribute("cy", y); circle.setAttribute("r", NODE_R);
-            circle.setAttribute("class", "node-circle"); circle.setAttribute("id", `circle-${id}`);
+            circle.setAttribute("cx", node.x); circle.setAttribute("cy", node.y); circle.setAttribute("r", NODE_R);
+            circle.setAttribute("class", "node-circle"); 
+            circle.setAttribute("id", `circle-${node.id}`);
+            if (treeMode === 'RBT') {
+                if (node.color === 'RED') circle.classList.add('red');
+                else circle.classList.add('black');
+            }
             const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            text.setAttribute("x", x); text.setAttribute("y", y); text.setAttribute("class", "node-text"); text.textContent = val;
+            text.setAttribute("x", node.x); text.setAttribute("y", node.y); text.setAttribute("class", "node-text"); 
+            text.textContent = node.value;
             g.appendChild(circle); g.appendChild(text); viewport.appendChild(g);
         }
 
-        function smartFit(treeW, treeH) {
+        function smartFit(treeW, treeH, offsetY = 40) {
             const w = container.clientWidth, h = container.clientHeight;
             const padding = 60; 
             const scale = Math.min((w - padding) / Math.max(treeW, 100), (h - padding) / Math.max(treeH, 100), 1.2);
             viewState.scale = Math.max(scale, 0.2);
             viewState.pX = (w - treeW * viewState.scale) / 2;
-            viewState.pY = (h - treeH * viewState.scale) / 2;
-            viewState.pY = Math.max(viewState.pY, 40);
+            
+            // Set Y to exactly offset, don't try to center vertically on mobile
+            // unless tree is very small
+            if (offsetY > 100) {
+                viewState.pY = offsetY;
+            } else {
+                viewState.pY = Math.max((h - treeH * viewState.scale) / 2, offsetY); 
+            }
+            
             updateTransform();
         }
 
         function updateTransform() { 
-            // Update SVG
             viewport.setAttribute("transform", `translate(${viewState.pX}, ${viewState.pY}) scale(${viewState.scale})`); 
-            // Update Drawings (Redraw everything in new coordinates)
             renderDrawings();
         }
         
-        // --- EVENT LISTENERS (PAN/ZOOM) ---
-        // Prevent default context menu for right click panning
-        window.oncontextmenu = (e) => e.preventDefault();
+        // --- INPUT HANDLING HELPER (MOUSE & TOUCH) ---
+        function getPointerPos(e) {
+            if (e.touches && e.touches.length > 0) {
+                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+            return { x: e.clientX, y: e.clientY };
+        }
 
+        // --- EVENT LISTENERS (PAN/ZOOM) ---
+        window.oncontextmenu = (e) => e.preventDefault();
         const wrapper = document.getElementById('container-wrapper');
 
-        // ZOOM (Scroll)
         wrapper.addEventListener('wheel', e => {
             e.preventDefault();
             const rect = wrapper.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
-            
-            // World coord before zoom
             const worldX = (mouseX - viewState.pX) / viewState.scale;
             const worldY = (mouseY - viewState.pY) / viewState.scale;
-
             const zoomSensitivity = 0.001;
             let newScale = viewState.scale + (e.deltaY * -zoomSensitivity * viewState.scale);
             newScale = Math.max(0.05, Math.min(newScale, 10));
-
             viewState.pX = mouseX - worldX * newScale;
             viewState.pY = mouseY - worldY * newScale;
             viewState.scale = newScale;
             updateTransform();
         }, { passive: false });
 
-        // PANNING LOGIC
-        wrapper.addEventListener('mousedown', e => {
-            // Button 0 = Left, 1 = Middle, 2 = Right
-            const isRightOrMiddle = e.button === 1 || e.button === 2;
-            const isHandTool = currentTool === 'hand' && e.button === 0;
+        function startPan(e) {
+            const pos = getPointerPos(e);
+            const isMouse = !e.touches;
+            const isRightOrMiddle = isMouse && (e.button === 1 || e.button === 2);
+            const isHandTool = currentTool === 'hand' && (isMouse ? e.button === 0 : true);
 
             if (isRightOrMiddle || isHandTool) {
                 viewState.isDragging = true;
-                viewState.startX = e.clientX - viewState.pX;
-                viewState.startY = e.clientY - viewState.pY;
+                viewState.startX = pos.x - viewState.pX;
+                viewState.startY = pos.y - viewState.pY;
                 wrapper.style.cursor = "grabbing";
             }
-        });
+        }
 
-        window.addEventListener('mousemove', e => {
+        function movePan(e) {
             if (viewState.isDragging) {
                 e.preventDefault();
-                viewState.pX = e.clientX - viewState.startX;
-                viewState.pY = e.clientY - viewState.startY;
+                const pos = getPointerPos(e);
+                viewState.pX = pos.x - viewState.startX;
+                viewState.pY = pos.y - viewState.startY;
                 updateTransform();
             }
-        });
+        }
 
-        window.addEventListener('mouseup', () => {
+        function endPan() {
             viewState.isDragging = false;
-            // Restore cursor based on tool
             if(currentTool === 'hand') wrapper.style.cursor = "grab";
-            else {
-                wrapper.style.cursor = "default";
-            }
-        });
+            else wrapper.style.cursor = "default";
+        }
+
+        wrapper.addEventListener('mousedown', startPan);
+        window.addEventListener('mousemove', movePan);
+        window.addEventListener('mouseup', endPan);
+        wrapper.addEventListener('touchstart', startPan, {passive: false});
+        window.addEventListener('touchmove', movePan, {passive: false});
+        window.addEventListener('touchend', endPan);
 
         const inputNode = document.getElementById('node-input');
         function autoResize() {
-            this.style.height = '36px'; 
-            this.style.height = this.scrollHeight + 'px'; 
+            this.style.height = 'auto'; 
+            const newHeight = Math.max(36, this.scrollHeight);
+            this.style.height = newHeight + 'px'; 
         }
         inputNode.addEventListener('input', autoResize);
-        
-        inputNode.addEventListener('keypress', function(e) {
-            if(e.key === "Enter") {
-                e.preventDefault(); 
-                initTree();
-            }
-        });
-
+        inputNode.addEventListener('keypress', function(e) { if(e.key === "Enter") { e.preventDefault(); initTree(); } });
         document.getElementById('search-input').addEventListener('keypress', (e) => { if(e.key === "Enter" && !searchBtn.disabled) searchTree(); });
         
-        // --- ADVANCED DRAWING ENGINE (VECTOR STATE) ---
+        // --- ADVANCED DRAWING ENGINE ---
         const drawCanvas = document.getElementById('draw-layer');
         const ctx = drawCanvas.getContext('2d');
         const colorPicker = document.getElementById('draw-color');
-        const sizeSlider = document.getElementById('size-slider');
+        const sizeDragger = document.getElementById('size-dragger');
+        const sizeValSpan = document.getElementById('size-val');
+        const miniSlider = document.getElementById('mini-slider');
         const cursorDiv = document.getElementById('brush-cursor');
         
-        // State
-        let drawings = []; // Array of { type: 'path'|'box'|..., color, size, points: [], ... }
+        let drawings = []; 
+        let history = []; 
+        let redoStack = []; 
         let currentStroke = null;
         let isDrawing = false;
         let currentTool = 'hand'; 
+        
+        let toolSettings = {
+            hand: { size: 0 },
+            pen: { size: 5 },
+            marker: { size: 25 },
+            eraser: { size: 20 },
+            box: { size: 3 },
+            circle: { size: 3 },
+            arrow: { size: 3 }
+        };
+
+        // --- RAF LOOP ---
+        let isDirty = true; 
+        function loop() {
+            if (isDirty) {
+                renderDrawings();
+                isDirty = false;
+            }
+            requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop); 
 
         function resizeCanvas() {
-            drawCanvas.width = wrapper.clientWidth;
-            drawCanvas.height = wrapper.clientHeight;
-            renderDrawings();
+            drawCanvas.width = window.innerWidth;
+            drawCanvas.height = window.innerHeight;
+            isDirty = true;
         }
         window.addEventListener('resize', resizeCanvas);
+
+        function updateToolUI() {
+            const s = toolSettings[currentTool].size;
+            sizeValSpan.textContent = s;
+            miniSlider.value = s;
+            const isHand = currentTool === 'hand';
+            sizeDragger.style.opacity = isHand ? '0.3' : '1';
+            sizeDragger.style.pointerEvents = isHand ? 'none' : 'auto';
+            miniSlider.style.opacity = isHand ? '0.3' : '1';
+            miniSlider.disabled = isHand;
+        }
 
         function setTool(tool) {
             currentTool = tool;
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.closest('.tool-btn').classList.add('active');
-            
-            // Cursor Logic
+            const btn = document.querySelector(`.tool-btn[onclick="setTool('${tool}')"]`);
+            if(btn) btn.classList.add('active');
+            updateToolUI();
             if (tool === 'hand') {
-                drawCanvas.style.pointerEvents = 'none'; // Let events pass to wrapper for pan
+                drawCanvas.style.pointerEvents = 'none'; 
                 cursorDiv.style.display = 'none';
                 wrapper.style.cursor = 'grab';
             } else {
-                drawCanvas.style.pointerEvents = 'auto'; // Capture for drawing
+                drawCanvas.style.pointerEvents = 'auto'; 
                 wrapper.style.cursor = 'default';
-                
                 if(['pen','marker','eraser'].includes(tool)) {
                     cursorDiv.style.display = 'block';
                     drawCanvas.style.cursor = 'none';
@@ -613,42 +868,142 @@
             }
         }
 
-        function clearDrawings() {
-            drawings = [];
-            renderDrawings();
+        function saveState() {
+            history.push(JSON.parse(JSON.stringify(drawings)));
+            redoStack = []; 
+            if (history.length > 50) history.shift();
         }
+        function undo() { if (history.length === 0) return; redoStack.push(JSON.parse(JSON.stringify(drawings))); drawings = history.pop(); isDirty = true; }
+        function redo() { if (redoStack.length === 0) return; history.push(JSON.parse(JSON.stringify(drawings))); drawings = redoStack.pop(); isDirty = true; }
+        function clearDrawings() { saveState(); drawings = []; isDirty = true; }
+        
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); if(e.shiftKey) redo(); else undo(); } 
+            else if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+        });
+
+        function updateSize(newSize) {
+            newSize = Math.max(1, Math.min(newSize, 100));
+            toolSettings[currentTool].size = newSize;
+            sizeValSpan.textContent = newSize;
+            miniSlider.value = newSize;
+            if(cursorDiv.style.display !== 'none') {
+                cursorDiv.style.width = (newSize * viewState.scale) + 'px';
+                cursorDiv.style.height = (newSize * viewState.scale) + 'px';
+            }
+        }
+        miniSlider.addEventListener('input', (e) => { updateSize(parseInt(e.target.value)); });
+
+        let isResizing = false;
+        let resizeStartX = 0;
+        let resizeStartVal = 0;
+
+        function startResize(e) {
+            isResizing = true;
+            const pos = getPointerPos(e);
+            resizeStartX = pos.x;
+            resizeStartVal = toolSettings[currentTool].size;
+            sizeDragger.classList.add('dragging');
+            document.body.style.cursor = 'ew-resize';
+        }
+        function moveResize(e) {
+            if(isResizing) {
+                e.preventDefault();
+                const pos = getPointerPos(e);
+                const delta = pos.x - resizeStartX;
+                let newSize = resizeStartVal + Math.floor(delta / 2);
+                updateSize(newSize);
+            }
+        }
+        function endResize() {
+            if(isResizing) {
+                isResizing = false;
+                sizeDragger.classList.remove('dragging');
+                document.body.style.cursor = 'default';
+            }
+        }
+        sizeDragger.addEventListener('mousedown', startResize);
+        window.addEventListener('mousemove', moveResize);
+        window.addEventListener('mouseup', endResize);
+        sizeDragger.addEventListener('touchstart', startResize, {passive: false});
+        window.addEventListener('touchmove', moveResize, {passive: false});
+        window.addEventListener('touchend', endResize);
+
+        // --- DRAGGABLE TOOLBAR LOGIC (JUMP FIX) ---
+        const toolbar = document.getElementById('toolbar');
+        const handle = document.getElementById('toolbar-drag');
+        let isDraggingToolbar = false;
+        let tbOffsetX, tbOffsetY; 
+
+        function startTbDrag(e) {
+            isDraggingToolbar = true;
+            const pos = getPointerPos(e);
+            
+            const layer = document.querySelector('.toolbar-layer');
+            const rect = layer.getBoundingClientRect();
+            
+            // CRITICAL FIX: Reset transform/right immediately
+            layer.style.right = 'auto';
+            layer.style.bottom = 'auto';
+            layer.style.transform = 'none'; 
+            
+            // Force set absolute coordinates to current visual spot
+            layer.style.left = rect.left + 'px';
+            layer.style.top = rect.top + 'px';
+            
+            // Calculate offset relative to corner of the bar
+            tbOffsetX = pos.x - rect.left;
+            tbOffsetY = pos.y - rect.top;
+            
+            document.body.style.cursor = 'grabbing';
+            handle.style.cursor = 'grabbing';
+        }
+        function moveTbDrag(e) {
+            if(isDraggingToolbar) {
+                e.preventDefault();
+                const pos = getPointerPos(e);
+                const layer = document.querySelector('.toolbar-layer');
+                layer.style.left = (pos.x - tbOffsetX) + 'px';
+                layer.style.top = (pos.y - tbOffsetY) + 'px';
+            }
+        }
+        function endTbDrag() {
+            if(isDraggingToolbar) {
+                isDraggingToolbar = false;
+                document.body.style.cursor = 'default';
+                handle.style.cursor = 'grab';
+            }
+        }
+        handle.addEventListener('mousedown', startTbDrag);
+        window.addEventListener('mousemove', moveTbDrag);
+        window.addEventListener('mouseup', endTbDrag);
+        handle.addEventListener('touchstart', startTbDrag, {passive: false});
+        window.addEventListener('touchmove', moveTbDrag, {passive: false});
+        window.addEventListener('touchend', endTbDrag);
 
         // --- DRAWING RENDERER ---
         function renderDrawings() {
             ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-            
             ctx.save();
-            // Apply Global Transform (Zoom/Pan)
             ctx.translate(viewState.pX, viewState.pY);
             ctx.scale(viewState.scale, viewState.scale);
+            ctx.globalAlpha = 1.0; ctx.globalCompositeOperation = 'source-over';
 
-            // Helper to draw a single item
             const drawItem = (d) => {
-                ctx.beginPath();
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                
+                ctx.beginPath(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
                 if (d.type === 'eraser') {
                     ctx.globalCompositeOperation = 'destination-out';
-                    ctx.lineWidth = d.size;
+                    ctx.globalAlpha = 1.0; ctx.strokeStyle = "rgba(0,0,0,1)"; ctx.lineWidth = d.size;
                 } else {
                     ctx.globalCompositeOperation = 'source-over';
-                    ctx.strokeStyle = d.color;
-                    ctx.lineWidth = d.size;
+                    ctx.strokeStyle = d.color; ctx.lineWidth = d.size;
                     ctx.globalAlpha = d.type === 'marker' ? 0.15 : 1.0;
                 }
 
                 if (['pen','marker','eraser'].includes(d.type)) {
                     if(d.points.length < 2) return;
                     ctx.moveTo(d.points[0].x, d.points[0].y);
-                    for(let i=1; i<d.points.length; i++) {
-                        ctx.lineTo(d.points[i].x, d.points[i].y);
-                    }
+                    for(let i=1; i<d.points.length; i++) ctx.lineTo(d.points[i].x, d.points[i].y);
                     ctx.stroke();
                 }
                 else if (d.type === 'box') {
@@ -656,139 +1011,112 @@
                     ctx.stroke();
                 }
                 else if (d.type === 'circle') {
-                    ctx.ellipse(d.cx, d.cy, d.rx, d.ry, 0, 0, 2 * Math.PI);
+                    let cx = d.x + d.w/2;
+                    let cy = d.y + d.h/2;
+                    let rx = Math.abs(d.w/2);
+                    let ry = Math.abs(d.h/2);
+                    ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
                     ctx.stroke();
                 }
                 else if (d.type === 'arrow') {
                     drawArrowInContext(ctx, d.x1, d.y1, d.x2, d.y2);
                 }
+                ctx.globalAlpha = 1.0; ctx.globalCompositeOperation = 'source-over';
             };
-
             drawings.forEach(drawItem);
-            
-            // Draw current stroke being drawn (Preview)
             if(currentStroke) drawItem(currentStroke);
-
             ctx.restore();
         }
 
         function drawArrowInContext(ctx, x1, y1, x2, y2) {
             const headlen = 15; 
-            const dx = x2 - x1;
-            const dy = y2 - y1;
-            const angle = Math.atan2(dy, dx);
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
+            const dx = x2 - x1; const dy = y2 - y1; const angle = Math.atan2(dy, dx);
+            ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
             ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
             ctx.moveTo(x2, y2);
             ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
             ctx.stroke();
         }
 
-        // --- DRAWING INPUT HANDLERS ---
-        // Convert screen coord to world coord
-        function toWorld(x, y) {
-            return {
-                x: (x - viewState.pX) / viewState.scale,
-                y: (y - viewState.pY) / viewState.scale
-            };
-        }
+        function toWorld(x, y) { return { x: (x - viewState.pX) / viewState.scale, y: (y - viewState.pY) / viewState.scale }; }
 
-        drawCanvas.addEventListener('mousedown', (e) => {
-            // Only Left Click (0) triggers drawing
-            if(e.button !== 0 || currentTool === 'hand') return;
+        function startDraw(e) {
+            if(!e.touches && e.button !== 0) return;
+            if(currentTool === 'hand') return;
 
+            e.preventDefault(); 
+            saveState();
             isDrawing = true;
-            const wPos = toWorld(e.offsetX, e.offsetY);
-            let size = parseInt(sizeSlider.value);
-            if(currentTool === 'marker') size = 25;
+            const pos = getPointerPos(e);
+            const wPos = toWorld(pos.x, pos.y);
+            let size = toolSettings[currentTool].size;
 
-            // Init Stroke Data
             if(['pen','marker','eraser'].includes(currentTool)) {
-                currentStroke = {
-                    type: currentTool,
-                    color: colorPicker.value,
-                    size: size,
-                    points: [{x: wPos.x, y: wPos.y}]
-                };
+                currentStroke = { type: currentTool, color: colorPicker.value, size: size, points: [{x: wPos.x, y: wPos.y}] };
             } else {
-                // Shapes
                 currentStroke = {
-                    type: currentTool,
-                    color: colorPicker.value,
-                    size: 3,
-                    startX: wPos.x, startY: wPos.y, // Store raw start
-                    // Temp placeholders
-                    x: wPos.x, y: wPos.y, w:0, h:0 
+                    type: currentTool, color: colorPicker.value, size: size,
+                    startX: wPos.x, startY: wPos.y,
+                    x: wPos.x, y: wPos.y, w: 0, h: 0, 
+                    x1: wPos.x, y1: wPos.y, x2: wPos.x, y2: wPos.y 
                 };
             }
-            renderDrawings();
-        });
+            isDirty = true;
+        }
 
-        window.addEventListener('mousemove', (e) => {
-            // Cursor Update
+        function moveDraw(e) {
+            const pos = getPointerPos(e);
             if(cursorDiv.style.display !== 'none') {
-                cursorDiv.style.left = e.clientX + 'px';
-                cursorDiv.style.top = e.clientY + 'px';
-                let size = parseInt(sizeSlider.value);
-                if(currentTool === 'marker') size = 25;
-                // Scale cursor visual based on zoom? 
-                // Actually, brush size is usually defined in screen pixels or world pixels?
-                // For a consistent "feel", brush usually scales with zoom in these apps.
-                // So the visual cursor should match the rendered line width * scale.
+                cursorDiv.style.left = pos.x + 'px';
+                cursorDiv.style.top = pos.y + 'px';
+                let size = toolSettings[currentTool].size;
                 cursorDiv.style.width = (size * viewState.scale) + 'px';
                 cursorDiv.style.height = (size * viewState.scale) + 'px';
             }
 
             if (!isDrawing || !currentStroke) return;
+            e.preventDefault();
 
-            // Get mouse position inside canvas
-            const rect = drawCanvas.getBoundingClientRect();
-            const wPos = toWorld(e.clientX - rect.left, e.clientY - rect.top);
+            const wPos = toWorld(pos.x, pos.y);
 
             if(['pen','marker','eraser'].includes(currentTool)) {
                 currentStroke.points.push({x: wPos.x, y: wPos.y});
             } 
-            else if (currentTool === 'box') {
+            else if (currentTool === 'box' || currentTool === 'circle') {
                 currentStroke.x = currentStroke.startX;
                 currentStroke.y = currentStroke.startY;
                 currentStroke.w = wPos.x - currentStroke.startX;
                 currentStroke.h = wPos.y - currentStroke.startY;
             }
-            else if (currentTool === 'circle') {
-                // Top-Left Logic
-                let startX = currentStroke.startX;
-                let startY = currentStroke.startY;
-                let endX = wPos.x;
-                let endY = wPos.y;
-                
-                currentStroke.cx = startX + (endX - startX)/2;
-                currentStroke.cy = startY + (endY - startY)/2;
-                currentStroke.rx = Math.abs((endX - startX)/2);
-                currentStroke.ry = Math.abs((endY - startY)/2);
-            }
             else if (currentTool === 'arrow') {
-                currentStroke.x1 = currentStroke.startX;
-                currentStroke.y1 = currentStroke.startY;
                 currentStroke.x2 = wPos.x;
                 currentStroke.y2 = wPos.y;
             }
-            renderDrawings();
-        });
+            isDirty = true;
+        }
 
-        window.addEventListener('mouseup', () => {
+        function endDraw() {
             if(isDrawing && currentStroke) {
                 drawings.push(currentStroke);
                 currentStroke = null;
                 isDrawing = false;
-                renderDrawings();
+                isDirty = true;
             }
-        });
+        }
+
+        drawCanvas.addEventListener('mousedown', startDraw);
+        window.addEventListener('mousemove', moveDraw);
+        window.addEventListener('mouseup', endDraw);
+        
+        drawCanvas.addEventListener('touchstart', startDraw, {passive: false});
+        window.addEventListener('touchmove', moveDraw, {passive: false});
+        window.addEventListener('touchend', endDraw);
 
         window.onload = () => {
             autoResize.call(inputNode);
             resizeCanvas();
             setTimeout(initTree, 50);
+            updateToolUI(); 
         };
     </script>
 </body>
