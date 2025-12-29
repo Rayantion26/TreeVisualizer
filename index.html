@@ -247,7 +247,7 @@
             mix-blend-mode: difference;
         }
 
-        /* TEXT TOOL INPUT STYLE - Transparent & Minimal */
+        /* TEXT TOOL INPUT STYLE - Fixed alignment & sizing */
         .temp-text-input {
             position: fixed;
             background: transparent;
@@ -261,8 +261,8 @@
             min-width: 50px;
             white-space: pre;
             overflow: hidden;
-            text-transform: none !important;
-            line-height: 1;
+            text-transform: none !important; /* Force no caps */
+            line-height: 1; 
         }
 
         .hint-overlay { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 0.85rem; color: var(--text-main); opacity: 0.6; pointer-events: none; user-select: none; background: var(--glass-bg); padding: 8px 16px; border-radius: 20px; border: 1px solid var(--glass-border); font-weight: 500; z-index: 5; text-align: center; width: 90%; }
@@ -496,50 +496,52 @@
         let currentCanvasDataURL = null;
 
         function openExport() {
-            // 1. Hide UI elements
-            const ui = document.querySelector('.ui-layer');
-            const toolbar = document.querySelector('.toolbar-layer');
-            const hint = document.querySelector('.hint-overlay');
-            const cursor = document.getElementById('brush-cursor');
+            // 1. Show modal immediately with loading state
+            document.getElementById('export-modal').style.display = 'flex';
+            document.getElementById('modal-loader').style.display = 'block';
+            document.getElementById('preview-img').style.display = 'none';
 
-            ui.style.display = 'none';
-            toolbar.style.display = 'none';
-            hint.style.display = 'none';
-            cursor.style.display = 'none';
-
-            // 2. Prepare History API (Try-catch for local file safety)
+            // Push state for mobile back button support (safely)
             try {
                 history.pushState({modalOpen: true}, "Export Modal", "#export");
             } catch (e) {
                 console.warn("History API restricted");
             }
 
-            // 3. Capture with timeout to ensure UI is hidden
+            // 2. Capture Canvas using ignoreElements to hide UI safely
             setTimeout(() => {
                 html2canvas(document.getElementById('container-wrapper'), {
+                    // Force background color to prevent transparency issues
                     backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-color').trim(),
                     scale: 2,
                     logging: false,
                     useCORS: true,
-                    allowTaint: true // Vital for local files
+                    allowTaint: false, // CRITICAL FIX: Must be false for toDataURL to work on downloads
+                    ignoreElements: (element) => {
+                        // Ignore UI layers explicitly during capture
+                        const className = element.className;
+                        if (typeof className === 'string') {
+                            if (className.includes('ui-layer') || 
+                                className.includes('toolbar-layer') || 
+                                className.includes('hint-overlay') || 
+                                element.id === 'brush-cursor' ||
+                                element.id === 'export-modal') {
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
                 }).then(canvas => {
                     currentCanvasDataURL = canvas.toDataURL('image/png');
-                    document.getElementById('preview-img').src = currentCanvasDataURL;
-                    document.getElementById('export-modal').style.display = 'flex';
-                    document.getElementById('preview-img').style.display = 'block';
-                    document.getElementById('modal-loader').style.display = 'none';
-
-                    // Restore UI now that capture is done
-                    ui.style.display = 'flex';
-                    toolbar.style.display = 'block';
-                    hint.style.display = 'block';
+                    const img = document.getElementById('preview-img');
+                    img.src = currentCanvasDataURL;
+                    img.onload = () => {
+                        document.getElementById('modal-loader').style.display = 'none';
+                        img.style.display = 'block';
+                    };
                 }).catch(err => {
                     console.error("Export failed:", err);
                     alert("Export failed. If running locally, browser security might be blocking canvas export.");
-                    // Restore UI
-                    ui.style.display = 'flex';
-                    toolbar.style.display = 'block';
-                    hint.style.display = 'block';
                     closeExport();
                 });
             }, 100);
@@ -547,11 +549,6 @@
 
         function closeExport() {
             document.getElementById('export-modal').style.display = 'none';
-            // Restore UI just in case
-            document.querySelector('.ui-layer').style.display = 'flex';
-            document.querySelector('.toolbar-layer').style.display = 'block';
-            document.querySelector('.hint-overlay').style.display = 'block';
-            
             try {
                 if (location.hash === "#export") {
                     history.back();
