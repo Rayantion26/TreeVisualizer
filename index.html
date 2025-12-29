@@ -247,6 +247,24 @@
             mix-blend-mode: difference;
         }
 
+        /* TEXT TOOL INPUT STYLE - Transparent & Minimal */
+        .temp-text-input {
+            position: fixed;
+            background: transparent;
+            border: none;
+            outline: 1px dashed var(--accent);
+            color: var(--text-main);
+            font-family: 'Roboto', sans-serif;
+            padding: 0;
+            margin: 0;
+            z-index: 1000;
+            min-width: 50px;
+            white-space: pre;
+            overflow: hidden;
+            text-transform: none !important;
+            line-height: 1;
+        }
+
         .hint-overlay { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 0.85rem; color: var(--text-main); opacity: 0.6; pointer-events: none; user-select: none; background: var(--glass-bg); padding: 8px 16px; border-radius: 20px; border: 1px solid var(--glass-border); font-weight: 500; z-index: 5; text-align: center; width: 90%; }
 
         /* --- PREVIEW MODAL --- */
@@ -264,12 +282,29 @@
             display: flex; flex-direction: column; gap: 15px;
             border: 1px solid var(--glass-border);
             box-shadow: var(--shadow);
-            width: 500px;
+            width: 600px;
+            position: relative;
         }
-        .modal-header { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 1.2rem; }
-        .preview-img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--glass-border); max-height: 50vh; object-fit: contain; background: var(--bg-color); }
-        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
-        .btn-secondary { background: var(--line-color); color: white; }
+        .modal-header { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 5px; text-align: center; }
+        .preview-img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--glass-border); max-height: 50vh; object-fit: contain; background: var(--bg-color); display: none; }
+        .modal-loader { text-align: center; font-family: 'Roboto', sans-serif; color: var(--text-main); padding: 20px; }
+
+        .modal-actions { 
+            display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 5px; z-index: 10;
+        }
+        .btn-modal-action {
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border: none;
+            display: flex; align-items: center; gap: 6px;
+            transition: transform 0.2s;
+        }
+        .btn-modal-action:active { transform: scale(0.95); }
+        .btn-back { background: var(--line-color); color: white; }
+        .btn-download { background: var(--accent); color: white; }
 
         /* SVG Styles */
         .node-group { cursor: pointer; }
@@ -320,12 +355,20 @@
     <div id="export-modal">
         <div class="modal-content">
             <div class="modal-header">Export Preview</div>
-            <img id="preview-img" class="preview-img" alt="Tree Preview">
+            
             <div class="modal-actions">
-                <button class="btn-action btn-secondary" onclick="closeExport()">Back</button>
-                <button class="btn-action" onclick="downloadPDF()">Download PDF</button>
-                <button class="btn-action" onclick="downloadPNG()">Download PNG</button>
+                <button class="btn-modal-action btn-back" onclick="closeExport()">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                    Back
+                </button>
+                <button class="btn-modal-action btn-download" onclick="downloadPNG()">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                    Download Image
+                </button>
             </div>
+
+            <div id="modal-loader" class="modal-loader">Generating Preview...</div>
+            <img id="preview-img" class="preview-img" alt="Tree Preview">
         </div>
     </div>
 
@@ -373,6 +416,9 @@
             
             <div class="separator"></div>
             
+            <button class="tool-btn" onclick="setTool('text')" title="Text Box">
+                <svg viewBox="0 0 24 24"><path d="M5 4v3h5.5v12h3V7H19V4z"/></svg>
+            </button>
             <button class="tool-btn" onclick="setTool('box')" title="Rectangle">
                 <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3m2 2v14h14V5H5z"/></svg>
             </button>
@@ -443,36 +489,90 @@
         <canvas id="draw-layer"></canvas>
     </div>
 
-    <div class="hint-overlay">Right/Middle Click to Pan • Scroll to Zoom • Left Click to Draw</div>
+    <div class="hint-overlay">Right/Middle Click to Pan • Scroll to Zoom • Left Click to Draw • 'T' for Text</div>
 
     <script>
         // --- EXPORT LOGIC ---
         let currentCanvasDataURL = null;
 
         function openExport() {
-            document.querySelector('.ui-layer').style.display = 'none';
-            document.querySelector('.toolbar-layer').style.display = 'none';
-            document.querySelector('.hint-overlay').style.display = 'none';
-            document.getElementById('brush-cursor').style.display = 'none';
+            // 1. Hide UI elements
+            const ui = document.querySelector('.ui-layer');
+            const toolbar = document.querySelector('.toolbar-layer');
+            const hint = document.querySelector('.hint-overlay');
+            const cursor = document.getElementById('brush-cursor');
 
-            html2canvas(document.getElementById('container-wrapper'), {
-                backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-color').trim(),
-                scale: 2
-            }).then(canvas => {
-                currentCanvasDataURL = canvas.toDataURL('image/png');
-                document.getElementById('preview-img').src = currentCanvasDataURL;
-                document.getElementById('export-modal').style.display = 'flex';
+            ui.style.display = 'none';
+            toolbar.style.display = 'none';
+            hint.style.display = 'none';
+            cursor.style.display = 'none';
 
-                document.querySelector('.ui-layer').style.display = 'flex';
-                document.querySelector('.toolbar-layer').style.display = 'block';
-                document.querySelector('.hint-overlay').style.display = 'block'; 
-                if(['pen','marker','eraser'].includes(currentTool)) document.getElementById('brush-cursor').style.display = 'block';
-            });
+            // 2. Prepare History API (Try-catch for local file safety)
+            try {
+                history.pushState({modalOpen: true}, "Export Modal", "#export");
+            } catch (e) {
+                console.warn("History API restricted");
+            }
+
+            // 3. Capture with timeout to ensure UI is hidden
+            setTimeout(() => {
+                html2canvas(document.getElementById('container-wrapper'), {
+                    backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-color').trim(),
+                    scale: 2,
+                    logging: false,
+                    useCORS: true,
+                    allowTaint: true // Vital for local files
+                }).then(canvas => {
+                    currentCanvasDataURL = canvas.toDataURL('image/png');
+                    document.getElementById('preview-img').src = currentCanvasDataURL;
+                    document.getElementById('export-modal').style.display = 'flex';
+                    document.getElementById('preview-img').style.display = 'block';
+                    document.getElementById('modal-loader').style.display = 'none';
+
+                    // Restore UI now that capture is done
+                    ui.style.display = 'flex';
+                    toolbar.style.display = 'block';
+                    hint.style.display = 'block';
+                }).catch(err => {
+                    console.error("Export failed:", err);
+                    alert("Export failed. If running locally, browser security might be blocking canvas export.");
+                    // Restore UI
+                    ui.style.display = 'flex';
+                    toolbar.style.display = 'block';
+                    hint.style.display = 'block';
+                    closeExport();
+                });
+            }, 100);
         }
 
         function closeExport() {
             document.getElementById('export-modal').style.display = 'none';
+            // Restore UI just in case
+            document.querySelector('.ui-layer').style.display = 'flex';
+            document.querySelector('.toolbar-layer').style.display = 'block';
+            document.querySelector('.hint-overlay').style.display = 'block';
+            
+            try {
+                if (location.hash === "#export") {
+                    history.back();
+                }
+            } catch(e) {}
         }
+
+        // Handle Back Button (Mobile) and ESC Key (Desktop)
+        window.addEventListener('popstate', (e) => {
+            if (document.getElementById('export-modal').style.display === 'flex') {
+                closeExport();
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (document.getElementById('export-modal').style.display === 'flex') {
+                    closeExport();
+                }
+            }
+        });
 
         function downloadPNG() {
             if(!currentCanvasDataURL) return;
@@ -480,18 +580,6 @@
             link.download = `tree-viz-${new Date().getTime()}.png`;
             link.href = currentCanvasDataURL;
             link.click();
-        }
-
-        function downloadPDF() {
-            if(!currentCanvasDataURL) return;
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF({
-                orientation: 'landscape',
-                unit: 'px',
-                format: [window.innerWidth, window.innerHeight]
-            });
-            pdf.addImage(currentCanvasDataURL, 'PNG', 0, 0, window.innerWidth, window.innerHeight);
-            pdf.save(`tree-viz-${new Date().getTime()}.pdf`);
         }
 
         function toggleTheme() {
@@ -523,7 +611,7 @@
             }
         }
 
-        // --- FIXED B-TREE LOGIC (NO EMPTY BOXES) ---
+        // --- NEW B-TREE LOGIC (BOTTOM-UP SPLIT) ---
         class BTreeNode {
             constructor(leaf = true) {
                 this.id = nodeIdCounter++;
@@ -537,7 +625,6 @@
         class BTreeLogic {
             constructor(order) {
                 this.order = order;
-                // Max keys = order - 1
                 this.root = null;
             }
             compare(a, b) {
@@ -550,51 +637,69 @@
                     this.root = new BTreeNode(true);
                     this.root.keys.push(k);
                 } else {
-                    if (this.root.keys.length === this.order - 1) {
-                        let s = new BTreeNode(false);
-                        s.children.push(this.root);
-                        this.splitChild(s, 0);
-                        this.root = s;
-                        this.insertNonFull(s, k);
-                    } else {
-                        this.insertNonFull(this.root, k);
+                    const stack = [];
+                    let curr = this.root;
+                    while (!curr.leaf) {
+                        stack.push(curr);
+                        let i = 0;
+                        while (i < curr.keys.length && this.compare(k, curr.keys[i]) > 0) {
+                            i++;
+                        }
+                        curr = curr.children[i];
+                    }
+                    this.insertNonFull(curr, k);
+                    
+                    if (curr.keys.length === this.order) {
+                        let splitResult = this.splitNode(curr);
+                        while (stack.length > 0) {
+                            const parent = stack.pop();
+                            this.insertIntoParent(parent, splitResult);
+                            if (parent.keys.length === this.order) {
+                                splitResult = this.splitNode(parent);
+                            } else {
+                                splitResult = null;
+                                break;
+                            }
+                        }
+                        if (splitResult) {
+                            const newRoot = new BTreeNode(false);
+                            newRoot.keys.push(splitResult.key);
+                            newRoot.children.push(splitResult.left);
+                            newRoot.children.push(splitResult.right);
+                            this.root = newRoot;
+                        }
                     }
                 }
             }
-            insertNonFull(x, k) {
-                let i = x.keys.length - 1;
-                if (x.leaf) {
-                    while (i >= 0 && this.compare(x.keys[i], k) > 0) i--;
-                    x.keys.splice(i + 1, 0, k);
-                } else {
-                    while (i >= 0 && this.compare(x.keys[i], k) > 0) i--;
+            insertNonFull(node, k) {
+                let i = 0;
+                while (i < node.keys.length && this.compare(k, node.keys[i]) > 0) {
                     i++;
-                    if (x.children[i].keys.length === this.order - 1) {
-                        this.splitChild(x, i);
-                        if (this.compare(x.keys[i], k) < 0) i++;
-                    }
-                    this.insertNonFull(x.children[i], k);
                 }
+                node.keys.splice(i, 0, k);
             }
-            splitChild(x, i) {
-                let y = x.children[i];
-                let z = new BTreeNode(y.leaf);
-                // Median index logic for standard B-Tree
-                let midIndex = Math.floor((this.order - 1) / 2);
-                
-                // Z gets keys after median
-                z.keys = y.keys.splice(midIndex + 1);
-                
-                // Z gets children after median (+1 because children count is keys + 1)
-                if (!y.leaf) {
-                    z.children = y.children.splice(midIndex + 1);
+            insertIntoParent(parent, splitData) {
+                let i = 0;
+                while (i < parent.keys.length && this.compare(splitData.key, parent.keys[i]) > 0) {
+                    i++;
                 }
-
-                // Middle key goes up
-                let midKey = y.keys.pop();
-
-                x.children.splice(i + 1, 0, z);
-                x.keys.splice(i, 0, midKey);
+                parent.keys.splice(i, 0, splitData.key);
+                parent.children.splice(i + 1, 0, splitData.right);
+            }
+            splitNode(node) {
+                const midIndex = Math.floor(this.order / 2);
+                const midKey = node.keys[midIndex];
+                const rightNode = new BTreeNode(node.leaf);
+                rightNode.keys = node.keys.splice(midIndex + 1);
+                node.keys.pop(); 
+                if (!node.leaf) {
+                    rightNode.children = node.children.splice(midIndex + 1);
+                }
+                return {
+                    key: midKey,
+                    left: node,
+                    right: rightNode
+                };
             }
         }
 
@@ -731,12 +836,20 @@
             searchBtn.disabled = true;
             deleteBtn.disabled = (treeMode !== 'BST'); 
 
+            // Calculate safe startY based on Header Box location
+            let startY = 60;
+            const panel = document.querySelector('.glass-panel');
+            if (panel) { 
+                const rect = panel.getBoundingClientRect(); 
+                if(rect.bottom > 50) startY = rect.bottom + 20; 
+            }
+
             if (treeMode === 'BTREE') {
                 let order = parseInt(document.getElementById('order-input').value) || 3;
                 bTreeInstance = new BTreeLogic(order);
                 final.forEach(n => bTreeInstance.insert(n));
                 if(bTreeInstance.root) {
-                    drawBTree(bTreeInstance.root);
+                    drawBTree(bTreeInstance.root, startY);
                 }
             } else {
                 treeInstance = new Tree(treeMode);
@@ -753,10 +866,7 @@
                     calcPos(treeInstance.root, 0);
                     drawLinks(treeInstance.root);
                     drawNodes(treeInstance.root);
-                    let startY = 40;
-                    const panel = document.querySelector('.glass-panel');
-                    if (panel) { const rect = panel.getBoundingClientRect(); if(rect.bottom > 50) startY = rect.bottom + 50; }
-                    smartFit((xCounter) * X_GAP, (getMaxDepth(treeInstance.root) + 1) * Y_GAP, startY);
+                    smartFit((xCounter) * X_GAP, (getMaxDepth(treeInstance.root) + 1) * Y_GAP, startY, treeInstance.root.x);
                     searchBtn.disabled = false;
                 } else { deleteBtn.disabled = true; }
             }
@@ -783,17 +893,20 @@
                  calcPos(treeInstance.root, 0);
                  drawLinks(treeInstance.root);
                  drawNodes(treeInstance.root);
+                 let startY = 60;
+                 const panel = document.querySelector('.glass-panel');
+                 if(panel) { const r = panel.getBoundingClientRect(); if(r.bottom>50) startY = r.bottom+20; }
+                 smartFit((xCounter) * X_GAP, (getMaxDepth(treeInstance.root) + 1) * Y_GAP, startY, treeInstance.root.x);
             } else { deleteBtn.disabled = true; searchBtn.disabled = true; }
         }
 
-        function drawBTree(root) {
+        function drawBTree(root, startY) {
             const CELL_W = 30; const NODE_H = 30; const V_GAP = 80; const H_GAP = 20;
             const calculateWidths = (node) => {
                 if (!node) return 0;
                 node.width = node.keys.length * CELL_W + 10; 
                 if (node.leaf) { node.subTreeWidth = node.width; } else {
                     let childrenWidth = 0;
-                    // Count only actual children
                     node.children.forEach((child, i) => { 
                         childrenWidth += calculateWidths(child); 
                         if (i < node.children.length - 1) childrenWidth += H_GAP; 
@@ -803,7 +916,10 @@
                 return node.subTreeWidth;
             };
             calculateWidths(root);
+            
             const render = (node, x, y) => {
+                if (!node || node.keys.length === 0) return;
+
                 const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
                 g.setAttribute("class", "node-group animate-pop");
                 const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -811,6 +927,7 @@
                 rect.setAttribute("width", node.width); rect.setAttribute("height", NODE_H);
                 rect.setAttribute("rx", 4); rect.setAttribute("class", "btree-node");
                 g.appendChild(rect);
+                
                 const startX = x - node.width/2 + 5;
                 node.keys.forEach((k, i) => {
                     const cellX = startX + i * CELL_W;
@@ -826,16 +943,13 @@
                     }
                 });
                 viewport.appendChild(g);
+                
                 if(!node.leaf) {
                     let currentChildX = x - node.subTreeWidth/2;
                     const nextY = y + V_GAP;
                     node.children.forEach((child, i) => {
                         const childX = currentChildX + child.subTreeWidth/2;
-                        
-                        // Smart slot connection: 
-                        // i=0 connects before key0, i=1 connects between key0-key1, etc.
                         const slotX = (x - node.width/2 + 5) + (i * CELL_W); 
-                        
                         const link = document.createElementNS("http://www.w3.org/2000/svg", "line");
                         link.setAttribute("x1", slotX); link.setAttribute("y1", y + NODE_H/2);
                         link.setAttribute("x2", childX); link.setAttribute("y2", nextY - NODE_H/2);
@@ -846,11 +960,8 @@
                     });
                 }
             };
-            let startY = 40;
-            const panel = document.querySelector('.glass-panel');
-            if(panel) { const r = panel.getBoundingClientRect(); if(r.bottom > 50) startY = r.bottom + 50; }
-            render(root, 0, startY + NODE_H/2);
-            smartFit(root.subTreeWidth, 500, startY);
+            render(root, 0, 0 + NODE_H/2);
+            smartFit(root.subTreeWidth, 500, startY, 0); 
         }
 
         async function searchTree() {
@@ -948,13 +1059,17 @@
             g.appendChild(circle); g.appendChild(text); viewport.appendChild(g);
         }
 
-        function smartFit(treeW, treeH, offsetY = 40) {
+        function smartFit(treeW, treeH, offsetY = 40, targetX = null) {
             const w = container.clientWidth, h = container.clientHeight;
             const padding = 60; 
             const scale = Math.min((w - padding) / Math.max(treeW, 100), (h - padding) / Math.max(treeH, 100), 1.2);
-            viewState.scale = Math.max(scale, 0.2);
-            viewState.pX = (w - treeW * viewState.scale) / 2;
-            viewState.pY = Math.max((h - treeH * viewState.scale) / 2, offsetY); 
+            viewState.scale = Math.max(scale, 0.4); 
+            if (targetX !== null) {
+                viewState.pX = (w / 2) - (targetX * viewState.scale);
+            } else {
+                viewState.pX = (w - treeW * viewState.scale) / 2;
+            }
+            viewState.pY = Math.max(offsetY, 60); 
             updateTransform();
         }
 
@@ -1057,6 +1172,7 @@
             pen: { size: 5 },
             marker: { size: 25 },
             eraser: { size: 20 },
+            text: { size: 20 },
             box: { size: 3 },
             circle: { size: 3 },
             arrow: { size: 3 }
@@ -1107,6 +1223,9 @@
                 if(['pen','marker','eraser'].includes(tool)) {
                     cursorDiv.style.display = 'block';
                     drawCanvas.style.cursor = 'none';
+                } else if(tool === 'text') {
+                    cursorDiv.style.display = 'none';
+                    drawCanvas.style.cursor = 'text';
                 } else {
                     cursorDiv.style.display = 'none';
                     drawCanvas.style.cursor = 'crosshair';
@@ -1123,9 +1242,21 @@
         function redo() { if (redoStack.length === 0) return; history.push(JSON.parse(JSON.stringify(drawings))); drawings = redoStack.pop(); isDirty = true; }
         function clearDrawings() { saveState(); drawings = []; isDirty = true; }
         
+        // FIXED UNDO LISTENER: Checks context
         window.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); if(e.shiftKey) redo(); else undo(); } 
-            else if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+            // IGNORE if the user is typing in an input field (like the Node Input or Search box)
+            // Note: We also ignore if the temp-text-input (class name check) is active
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') { 
+                e.preventDefault(); 
+                if(e.shiftKey) redo(); 
+                else undo(); 
+            } 
+            else if ((e.ctrlKey || e.metaKey) && e.key === 'y') { 
+                e.preventDefault(); 
+                redo(); 
+            }
         });
 
         function updateSize(newSize) {
@@ -1184,20 +1315,16 @@
             e.preventDefault();
             isDraggingToolbar = true;
             const pos = getPointerPos(e);
-            
             const layer = document.querySelector('.toolbar-layer');
             const rect = layer.getBoundingClientRect();
-            
             layer.classList.remove('pinned-mobile');
             layer.style.left = rect.left + 'px';
             layer.style.top = rect.top + 'px';
             layer.style.right = 'auto';
             layer.style.bottom = 'auto';
             layer.style.transform = 'none'; 
-            
             tbOffsetX = pos.x - rect.left;
             tbOffsetY = pos.y - rect.top;
-            
             document.body.style.cursor = 'grabbing';
             handle.style.cursor = 'grabbing';
         }
@@ -1239,7 +1366,7 @@
                     ctx.globalAlpha = 1.0; ctx.strokeStyle = "rgba(0,0,0,1)"; ctx.lineWidth = d.size;
                 } else {
                     ctx.globalCompositeOperation = 'source-over';
-                    ctx.strokeStyle = d.color; ctx.lineWidth = d.size;
+                    ctx.strokeStyle = d.color; ctx.fillStyle = d.color; ctx.lineWidth = d.size;
                     ctx.globalAlpha = d.type === 'marker' ? 0.15 : 1.0;
                 }
 
@@ -1264,6 +1391,15 @@
                 else if (d.type === 'arrow') {
                     drawArrowInContext(ctx, d.x1, d.y1, d.x2, d.y2);
                 }
+                else if (d.type === 'text') {
+                    // FIXED: Text Baseline Alignment and Size Matching
+                    ctx.save();
+                    ctx.textBaseline = 'top'; // Matches textarea top-left positioning
+                    ctx.font = `${d.size}px 'Roboto', sans-serif`; // Uses base size, canvas scale handles zoom
+                    ctx.fillStyle = d.color;
+                    ctx.fillText(d.text, d.x, d.y);
+                    ctx.restore();
+                }
                 ctx.globalAlpha = 1.0; ctx.globalCompositeOperation = 'source-over';
             };
             drawings.forEach(drawItem);
@@ -1286,6 +1422,51 @@
         function startDraw(e) {
             if(!e.touches && e.button !== 0) return;
             if(currentTool === 'hand') return;
+
+            // Handle Text Tool
+            if (currentTool === 'text') {
+                e.preventDefault();
+                const pos = getPointerPos(e);
+                const wPos = toWorld(pos.x, pos.y);
+                
+                const input = document.createElement('textarea');
+                input.className = 'temp-text-input';
+                input.style.left = pos.x + 'px';
+                input.style.top = pos.y + 'px';
+                // FIXED: Font size matches canvas zoom exactly
+                input.style.fontSize = (toolSettings.text.size * viewState.scale) + 'px';
+                input.style.color = colorPicker.value;
+                input.style.borderColor = colorPicker.value;
+                
+                document.body.appendChild(input);
+                setTimeout(() => input.focus(), 10);
+
+                const saveText = () => {
+                    if (input.value.trim() !== "") {
+                        saveState();
+                        drawings.push({
+                            type: 'text',
+                            x: wPos.x,
+                            y: wPos.y, 
+                            text: input.value,
+                            color: colorPicker.value,
+                            size: toolSettings.text.size
+                        });
+                        isDirty = true;
+                    }
+                    if(document.body.contains(input)) document.body.removeChild(input);
+                };
+
+                input.addEventListener('blur', saveText);
+                input.addEventListener('keydown', (e) => {
+                    if(e.key === 'Enter' && !e.shiftKey) { // Shift+Enter for new line
+                        e.preventDefault();
+                        input.blur();
+                    }
+                });
+                
+                return; // Stop here, don't start drawing stroke
+            }
 
             e.preventDefault(); 
             saveState();
